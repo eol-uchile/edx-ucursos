@@ -3,7 +3,7 @@
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.contrib.sites.shortcuts import get_current_site
 from django.db import transaction
@@ -39,7 +39,7 @@ class EdxUCursosLoginRedirect(View):
     def get(self, request):
         ticket = request.GET.get('ticket', "")
         logger.info('ticket: ' + ticket)
-
+        logout(request)
         user_data = self.get_data_ticket(ticket)
         if user_data['result'] == 'error':
             logger.info('Data error')
@@ -145,6 +145,7 @@ class EdxUCursosCallback(View):
     def get(self, request):
         token = request.GET.get('token', "")
         logger.info('token: ' + token)
+        logout(request)
         try:
             edxucursostoken = EdxUCursosTokens.objects.get(token=token)
             login(
