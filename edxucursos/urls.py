@@ -6,5 +6,5 @@ from .views import *
 
 urlpatterns = [
     url('externo/', EdxUCursosLoginRedirect.as_view(), name='login'),
-    #url('callback/', EdxUCursosCallback.as_view(), name='callback'),
+    url('callback/', EdxUCursosCallback.as_view(), name='callback'),
 ]

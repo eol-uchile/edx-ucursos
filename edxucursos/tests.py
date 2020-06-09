@@ -17,12 +17,13 @@ from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from student.roles import CourseInstructorRole, CourseStaffRole
+from .models import EdxUCursosTokens
 import re
 import json
 import urlparse
 import time
-
-from .views import EdxUCursosLoginRedirect
+import uuid
+from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
 
 
 class TestRedirectView(TestCase):
@@ -30,6 +31,7 @@ class TestRedirectView(TestCase):
     def setUp(self):
         self.client_login = Client()
         self.client = Client()
+        self.token = str(uuid.uuid4())
         self.user = UserFactory(
             username='student',
             password='12345',
@@ -37,11 +39,56 @@ class TestRedirectView(TestCase):
 
     def test_redirect_already_logged(self):
         user = User.objects.create_user(username='testuser', password='123')
+        EdxUCursosTokens.objects.create(token=self.token, user=user)
         self.client_login.login(username='testuser', password='123')
         result = self.client_login.get(reverse('edxucursos-login:login'))
-        assert_true(
-            'http://testserver/?token=None' not in result._container[0])
-        self.assertIn('http://testserver/?token=', result._container[0])
+
+        self.assertEquals(
+            'http://testserver/edxucursos/callback/?token=' +
+            self.token,
+            result._container[0])
+
+    @patch('requests.get')
+    def test_redirect_already_logged_no_token(self, get):
+        from uchileedxlogin.models import EdxLoginUser
+
+        user = User.objects.create_user(username='testuser2', password='123')
+        EdxLoginUser.objects.create(user=user, run='0000000108')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        self.client_login.login(username='testuser2', password='123')
+        result = self.client_login.get(reverse('edxucursos-login:login'))
+        edxucursostoken = EdxUCursosTokens.objects.get(user=user)
+        self.assertEquals(
+            'http://testserver/edxucursos/callback/?token=' +
+            edxucursostoken.token,
+            result._container[0])
 
     @patch('requests.get')
     def test_login(self, get):
@@ -79,9 +126,12 @@ class TestRedirectView(TestCase):
             reverse('edxucursos-login:login'),
             data={
                 'ticket': 'testticket'})
-        assert_true(
-            'http://testserver/?token=None' not in result._container[0])
-        self.assertIn('http://testserver/?token=', result._container[0])
+
+        edxucursostoken = EdxUCursosTokens.objects.get(user=self.user)
+        self.assertEquals(
+            'http://testserver/edxucursos/callback/?token=' +
+            edxucursostoken.token,
+            result._container[0])
 
     @patch('requests.get')
     def test_login_wrong_or_none_ticket(self, get):
@@ -199,3 +249,38 @@ class TestRedirectView(TestCase):
                 'ticket': 'testticket'})
         self.assertEquals(result.status_code, 404)
         self.assertEquals(result._container[0], 'User not Found')
+
+
+class TestCallbackView(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.token = str(uuid.uuid4())
+        self.user = UserFactory(
+            username='student',
+            password='12345',
+            email='student@edx.org')
+
+    def test_normal(self):
+        from uchileedxlogin.models import EdxLoginUser
+        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxUCursosTokens.objects.create(token=self.token, user=self.user)
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': self.token})
+        self.assertEquals(result.status_code, 302)
+        self.assertEquals(
+            result._headers['location'], ('Location', '/dashboard'))
+
+    def test_callback_wrong_or_no_token(self):
+        from uchileedxlogin.models import EdxLoginUser
+        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxUCursosTokens.objects.create(token=self.token, user=self.user)
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': ""})
+        self.assertEquals(result.status_code, 404)
+        self.assertEquals(
+            result._container[0],
+            'Logging Error: Token no Exists')

@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.views.generic.base import View
 from django.http import HttpResponse
 from uchileedxlogin.models import EdxLoginUser, EdxLoginUserCourseRegistration
+from models import EdxUCursosTokens
 from urllib import urlencode
 from itertools import cycle
 from opaque_keys.edx.keys import CourseKey
@@ -39,9 +40,16 @@ class EdxUCursosLoginRedirect(View):
         ticket = request.GET.get('ticket', "")
         logger.info('ticket: ' + ticket)
         if request.user.is_authenticated():
-            logger.info('User logged')
-            return HttpResponse(
-                EdxUCursosLoginRedirect.get_callback_url(request))
+            try:
+                edxucursostoken = EdxUCursosTokens.objects.get(
+                    user=request.user)
+                token = edxucursostoken.token
+                logger.info('User logged')
+                return HttpResponse(
+                    EdxUCursosLoginRedirect.get_callback_url(request, token))
+            except EdxUCursosTokens.DoesNotExist:
+                logger.info('No exists token for user logged')
+                pass
 
         user_data = self.get_data_ticket(ticket)
         if user_data['result'] == 'error':
@@ -61,15 +69,9 @@ class EdxUCursosLoginRedirect(View):
         edxlogin_user = self.get_edxlogin_user(rut)
         if edxlogin_user:
             logger.info('Exists EdxLogin_User: ' + edxlogin_user.user.username)
-            try:
-                self.login_user(request, edxlogin_user)
-                return HttpResponse(
-                    EdxUCursosLoginRedirect.get_callback_url(request))
-            except Exception:
-                logger.exception(
-                    "Error logging " +
-                    edxlogin_user.user.username)
-                return HttpResponseNotFound('Error logging')
+            token = self.get_or_create_token(edxlogin_user.user)
+            return HttpResponse(
+                EdxUCursosLoginRedirect.get_callback_url(request, token))
         else:
             logger.info('User not Found: ' + rut)
             return HttpResponseNotFound('User not Found')
@@ -127,11 +129,39 @@ class EdxUCursosLoginRedirect(View):
             backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
         )
 
+    def get_or_create_token(self, user):
+        token = str(uuid.uuid4())
+        while EdxUCursosTokens.objects.filter(token=token).exists():
+            token = str(uuid.uuid4())
+        try:
+            edxucursostoken = EdxUCursosTokens.objects.get(user=user)
+            edxucursostoken.token = token
+            edxucursostoken.save()
+        except EdxUCursosTokens.DoesNotExist:
+            EdxUCursosTokens.objects.create(token=token, user=user)
+
+        return token
+
     @staticmethod
-    def get_callback_url(request):
+    def get_callback_url(request, token):
         """
         Get the callback url
         """
-        token = request.session.session_key
-        url = request.build_absolute_uri('/')
+        url = request.build_absolute_uri(reverse('edxucursos-login:callback'))
         return '{}?token={}'.format(url, token)
+
+
+class EdxUCursosCallback(View):
+    def get(self, request):
+        token = request.GET.get('token', "")
+        logger.info('token: ' + token)
+        try:
+            edxucursostoken = EdxUCursosTokens.objects.get(token=token)
+            login(
+                request,
+                edxucursostoken.user,
+                backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
+            )
+            return HttpResponseRedirect("/dashboard")
+        except (EdxUCursosTokens.DoesNotExist, Exception):
+            return HttpResponseNotFound('Logging Error: Token no Exists')
