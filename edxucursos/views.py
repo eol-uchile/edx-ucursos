@@ -39,17 +39,6 @@ class EdxUCursosLoginRedirect(View):
     def get(self, request):
         ticket = request.GET.get('ticket', "")
         logger.info('ticket: ' + ticket)
-        if request.user.is_authenticated():
-            try:
-                edxucursostoken = EdxUCursosTokens.objects.get(
-                    user=request.user)
-                token = edxucursostoken.token
-                logger.info('User logged')
-                return HttpResponse(
-                    EdxUCursosLoginRedirect.get_callback_url(request, token))
-            except EdxUCursosTokens.DoesNotExist:
-                logger.info('No exists token for user logged')
-                pass
 
         user_data = self.get_data_ticket(ticket)
         if user_data['result'] == 'error':
@@ -85,7 +74,8 @@ class EdxUCursosLoginRedirect(View):
             params=urlencode(parameters),
             headers={
                 'content-type': 'application/json'})
-        if result.status_code == 200:
+        logger.info(result.text)
+        if result.text != 'null':
             data = json.loads(result.text)
             data['result'] = 'success'
             return data

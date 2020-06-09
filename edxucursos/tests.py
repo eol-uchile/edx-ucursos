@@ -37,15 +37,47 @@ class TestRedirectView(TestCase):
             password='12345',
             email='student@edx.org')
 
-    def test_redirect_already_logged(self):
+    @patch('requests.get')
+    def test_redirect_already_logged(self, get):
+        from uchileedxlogin.models import EdxLoginUser
         user = User.objects.create_user(username='testuser', password='123')
+        EdxLoginUser.objects.create(user=user, run='0000000108')
         EdxUCursosTokens.objects.create(token=self.token, user=user)
         self.client_login.login(username='testuser', password='123')
-        result = self.client_login.get(reverse('edxucursos-login:login'))
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
 
+        result = self.client_login.get(reverse('edxucursos-login:login'))
+        edxucursostoken = EdxUCursosTokens.objects.get(user=user)
+        self.assertNotEqual(edxucursostoken.token, self.token)
         self.assertEquals(
-            'http://testserver/edxucursos/callback/?token=' +
-            self.token,
+            'http://testserver/edxucursos/callback?token=' +
+            edxucursostoken.token,
             result._container[0])
 
     @patch('requests.get')
@@ -86,14 +118,14 @@ class TestRedirectView(TestCase):
         result = self.client_login.get(reverse('edxucursos-login:login'))
         edxucursostoken = EdxUCursosTokens.objects.get(user=user)
         self.assertEquals(
-            'http://testserver/edxucursos/callback/?token=' +
+            'http://testserver/edxucursos/callback?token=' +
             edxucursostoken.token,
             result._container[0])
 
     @patch('requests.get')
     def test_login(self, get):
         from uchileedxlogin.models import EdxLoginUser
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -103,7 +135,7 @@ class TestRedirectView(TestCase):
                 200,
                 json.dumps(
                     {
-                        "pers_id": 19027537,
+                        "pers_id": 10,
                         "permisos": {
                             "PROFESOR": 1,
                             "VER": 1,
@@ -129,41 +161,21 @@ class TestRedirectView(TestCase):
 
         edxucursostoken = EdxUCursosTokens.objects.get(user=self.user)
         self.assertEquals(
-            'http://testserver/edxucursos/callback/?token=' +
+            'http://testserver/edxucursos/callback?token=' +
             edxucursostoken.token,
             result._container[0])
 
     @patch('requests.get')
     def test_login_wrong_or_none_ticket(self, get):
         from uchileedxlogin.models import EdxLoginUser
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
                 [
                     "status_code",
                     "text"])(
-                404,
-                json.dumps(
-                    {
-                        "pers_id": 19027537,
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
+                200, 'null')]
 
         result = self.client.get(
             reverse('edxucursos-login:login'),
@@ -177,7 +189,7 @@ class TestRedirectView(TestCase):
     @patch('requests.get')
     def test_login_caducity_ticket(self, get):
         from uchileedxlogin.models import EdxLoginUser
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -187,7 +199,7 @@ class TestRedirectView(TestCase):
                 200,
                 json.dumps(
                     {
-                        "pers_id": 19027537,
+                        "pers_id": 10,
                         "permisos": {
                             "PROFESOR": 1,
                             "VER": 1,
@@ -224,7 +236,7 @@ class TestRedirectView(TestCase):
                 200,
                 json.dumps(
                     {
-                        "pers_id": 19027537,
+                        "pers_id": 10,
                         "permisos": {
                             "PROFESOR": 1,
                             "VER": 1,
@@ -262,7 +274,7 @@ class TestCallbackView(TestCase):
 
     def test_normal(self):
         from uchileedxlogin.models import EdxLoginUser
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosTokens.objects.create(token=self.token, user=self.user)
         result = self.client.get(
             reverse('edxucursos-login:callback'),
@@ -274,7 +286,7 @@ class TestCallbackView(TestCase):
 
     def test_callback_wrong_or_no_token(self):
         from uchileedxlogin.models import EdxLoginUser
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosTokens.objects.create(token=self.token, user=self.user)
         result = self.client.get(
             reverse('edxucursos-login:callback'),
