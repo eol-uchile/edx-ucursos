@@ -21,7 +21,10 @@ from opaque_keys import InvalidKeyError
 from courseware.courses import get_course_by_id, get_course_with_access
 from courseware.access import has_access
 from util.json_request import JsonResponse, JsonResponseBadRequest
-
+from rest_framework_jwt.settings import api_settings
+from datetime import datetime as dt
+from rest_framework_jwt.utils import jwt_get_secret_key
+import datetime
 import json
 import requests
 import uuid
@@ -30,6 +33,8 @@ import logging
 import sys
 import unicodecsv as csv
 import time
+import jwt
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +63,6 @@ class EdxUCursosLoginRedirect(View):
         course = self.get_edxucursos_mapping(user_data['grupo'])
         if edxlogin_user:
             logger.info('Exists EdxLogin_User: ' + edxlogin_user.user.username)
-            from rest_framework_jwt.settings import api_settings
 
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
@@ -133,10 +137,6 @@ class EdxUCursosLoginRedirect(View):
         return token
 
     def get_payload(self, user, course):
-        from rest_framework_jwt.settings import api_settings
-        from datetime import datetime as dt
-        import datetime
-
         payload = {'username': user.username, 'user_id': user.id, 'exp': dt.utcnow(
         ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME), 'course': course}
 
@@ -159,9 +159,6 @@ class EdxUCursosCallback(View):
         token = request.GET.get('token', "")
         logger.info('token: ' + token)
         logout(request)
-        import jwt
-        import six
-
         try:
             payload = self.decode_token(token)
         except jwt.ExpiredSignatureError:
@@ -193,10 +190,6 @@ class EdxUCursosCallback(View):
             return HttpResponseNotFound('Logging Error or User no Exists')
 
     def decode_token(self, token):
-        from rest_framework_jwt.settings import api_settings
-        from rest_framework_jwt.utils import jwt_get_secret_key
-        import jwt
-
         options = {
             'verify_exp': True,
             'verify_aud': True

@@ -17,14 +17,18 @@ from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from student.roles import CourseInstructorRole, CourseStaffRole
+from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
+from models import EdxUCursosMapping
+from uchileedxlogin.models import EdxLoginUser
+from rest_framework_jwt.settings import api_settings
+from datetime import datetime as dt
+import datetime
+import time
 import re
 import json
 import urlparse
 import time
 import uuid
-from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
-from models import EdxUCursosMapping
-
 
 class TestRedirectView(TestCase):
 
@@ -38,7 +42,6 @@ class TestRedirectView(TestCase):
 
     @patch('requests.get')
     def test_login(self, get):
-        from uchileedxlogin.models import EdxLoginUser
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
@@ -79,7 +82,6 @@ class TestRedirectView(TestCase):
 
     @patch('requests.get')
     def test_login_wrong_or_none_ticket(self, get):
-        from uchileedxlogin.models import EdxLoginUser
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
@@ -100,7 +102,6 @@ class TestRedirectView(TestCase):
 
     @patch('requests.get')
     def test_login_caducity_ticket(self, get):
-        from uchileedxlogin.models import EdxLoginUser
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
@@ -185,10 +186,6 @@ class TestCallbackView(TestCase):
             email='student@edx.org')
 
     def test_normal(self):
-        from uchileedxlogin.models import EdxLoginUser
-        from rest_framework_jwt.settings import api_settings
-        from datetime import datetime as dt
-        import datetime
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
@@ -215,7 +212,6 @@ class TestCallbackView(TestCase):
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
 
     def test_callback_no_token(self):
-        from uchileedxlogin.models import EdxLoginUser
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
@@ -227,10 +223,6 @@ class TestCallbackView(TestCase):
             'Decoding failure')
 
     def test_callback_wrong_token_data(self):
-        from uchileedxlogin.models import EdxLoginUser
-        from rest_framework_jwt.settings import api_settings
-        from datetime import datetime as dt
-        import datetime
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
@@ -251,8 +243,6 @@ class TestCallbackView(TestCase):
             'Decoding failure')
 
     def test_callback_wrong_token(self):
-        from uchileedxlogin.models import EdxLoginUser
-
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
@@ -264,10 +254,6 @@ class TestCallbackView(TestCase):
             'Decoding failure')
 
     def test_callback_expired_token(self):
-        from uchileedxlogin.models import EdxLoginUser
-        from rest_framework_jwt.settings import api_settings
-        from datetime import datetime as dt
-        import datetime
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow(),
@@ -277,7 +263,6 @@ class TestCallbackView(TestCase):
 
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
-        import time
         time.sleep(2)
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
@@ -290,10 +275,6 @@ class TestCallbackView(TestCase):
             'Caducity Token')
 
     def test_callback_no_course(self):
-        from uchileedxlogin.models import EdxLoginUser
-        from rest_framework_jwt.settings import api_settings
-        from datetime import datetime as dt
-        import datetime
         payload = {'username': self.user.username, 'user_id': self.user.id, 'exp': dt.utcnow(
         ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
 
@@ -314,10 +295,6 @@ class TestCallbackView(TestCase):
             'Decoding failure: No Course')
 
     def test_callback_no_mapping_course(self):
-        from uchileedxlogin.models import EdxLoginUser
-        from rest_framework_jwt.settings import api_settings
-        from datetime import datetime as dt
-        import datetime
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
