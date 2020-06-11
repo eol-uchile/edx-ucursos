@@ -25,6 +25,7 @@ import uuid
 from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
 from models import EdxUCursosMapping
 
+
 class TestRedirectView(TestCase):
 
     def setUp(self):
@@ -189,25 +190,29 @@ class TestCallbackView(TestCase):
         from datetime import datetime as dt
         import datetime
         payload = {'username': self.user.username,
-                    'user_id': self.user.id,
-                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
-                    'course': 'demo/2020/0/CV2020/1'}
-        
+                   'user_id': self.user.id,
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'course': 'demo/2020/0/CV2020/1'}
+
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
-        
+
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
 
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
-        EdxUCursosMapping.objects.create(edx_course='course-v1:mss+MSS001+2019_2',ucurso_course='demo/2020/0/CV2020/1')
+        EdxUCursosMapping.objects.create(
+            edx_course='course-v1:mss+MSS001+2019_2',
+            ucurso_course='demo/2020/0/CV2020/1')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
         self.assertEquals(result.status_code, 302)
         self.assertEquals(
-            result._headers['location'], ('Location', '/courses/course-v1:mss+MSS001+2019_2/course/'))
+            result._headers['location'],
+            ('Location',
+             '/courses/course-v1:mss+MSS001+2019_2/course/'))
 
     def test_callback_no_token(self):
         from uchileedxlogin.models import EdxLoginUser
@@ -227,11 +232,11 @@ class TestCallbackView(TestCase):
         from datetime import datetime as dt
         import datetime
         payload = {'username': self.user.username,
-                    'user_id': self.user.id,
-                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
-                    'course': 'demo/2020/0/CV2020/1'}
+                   'user_id': self.user.id,
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'course': 'demo/2020/0/CV2020/1'}
         payload['aud'] = "WRONG_AUD_TEST"
-        
+
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
 
@@ -244,10 +249,10 @@ class TestCallbackView(TestCase):
         self.assertEquals(
             result._container[0],
             'Decoding failure')
-    
+
     def test_callback_wrong_token(self):
         from uchileedxlogin.models import EdxLoginUser
-        
+
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
@@ -264,12 +269,12 @@ class TestCallbackView(TestCase):
         from datetime import datetime as dt
         import datetime
         payload = {'username': self.user.username,
-                    'user_id': self.user.id,
-                    'exp': dt.utcnow(),
-                    'course': 'demo/2020/0/CV2020/1'}
+                   'user_id': self.user.id,
+                   'exp': dt.utcnow(),
+                   'course': 'demo/2020/0/CV2020/1'}
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
-        
+
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
         import time
@@ -283,19 +288,18 @@ class TestCallbackView(TestCase):
         self.assertEquals(
             result._container[0],
             'Caducity Token')
-    
+
     def test_callback_no_course(self):
         from uchileedxlogin.models import EdxLoginUser
         from rest_framework_jwt.settings import api_settings
         from datetime import datetime as dt
         import datetime
-        payload = {'username': self.user.username,
-                    'user_id': self.user.id,
-                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
-        
+        payload = {'username': self.user.username, 'user_id': self.user.id, 'exp': dt.utcnow(
+        ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
+
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
-        
+
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
 
@@ -308,20 +312,20 @@ class TestCallbackView(TestCase):
         self.assertEquals(
             result._container[0],
             'Decoding failure: No Course')
-    
+
     def test_callback_no_mapping_course(self):
         from uchileedxlogin.models import EdxLoginUser
         from rest_framework_jwt.settings import api_settings
         from datetime import datetime as dt
         import datetime
         payload = {'username': self.user.username,
-                    'user_id': self.user.id,
-                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
-                    'course': 'test/2020/0/CV2020/1'}
-        
+                   'user_id': self.user.id,
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'course': 'test/2020/0/CV2020/1'}
+
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
-        
+
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
 

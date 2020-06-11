@@ -115,7 +115,11 @@ class EdxUCursosLoginRedirect(View):
         return str(d)
 
     def get_edxucursos_mapping(self, data):
-        return '{}/{}/{}/{}/{}'.format(data['base'], data['anno'], data['semestre'], data['codigo'], data['seccion'])
+        return '{}/{}/{}/{}/{}'.format(data['base'],
+                                       data['anno'],
+                                       data['semestre'],
+                                       data['codigo'],
+                                       data['seccion'])
 
     def login_user(self, request, edxlogin_user):
         """
@@ -132,11 +136,9 @@ class EdxUCursosLoginRedirect(View):
         from rest_framework_jwt.settings import api_settings
         from datetime import datetime as dt
         import datetime
-        
-        payload = {'username': user.username,
-                    'user_id': user.id,
-                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
-                    'course': course}
+
+        payload = {'username': user.username, 'user_id': user.id, 'exp': dt.utcnow(
+        ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME), 'course': course}
 
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
@@ -166,12 +168,13 @@ class EdxUCursosCallback(View):
             return HttpResponseNotFound('Caducity Token')
         except Exception:
             return HttpResponseNotFound('Decoding failure')
-        
+
         if 'course' not in payload:
             return HttpResponseNotFound('Decoding failure: No Course')
 
         try:
-            course = EdxUCursosMapping.objects.get(ucurso_course=payload['course'])
+            course = EdxUCursosMapping.objects.get(
+                ucurso_course=payload['course'])
             course_id = six.text_type(course.edx_course)
         except EdxUCursosMapping.DoesNotExist:
             return HttpResponseNotFound('EdxUCursosMapping DoesNotExist')
@@ -184,13 +187,14 @@ class EdxUCursosCallback(View):
                 backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
             )
             request.session.set_expiry(0)
-            return HttpResponseRedirect("/courses/{}/course/".format(course_id))
+            return HttpResponseRedirect(
+                "/courses/{}/course/".format(course_id))
         except (User.DoesNotExist, Exception):
             return HttpResponseNotFound('Logging Error or User no Exists')
 
     def decode_token(self, token):
         from rest_framework_jwt.settings import api_settings
-        from rest_framework_jwt.utils import jwt_get_secret_key 
+        from rest_framework_jwt.utils import jwt_get_secret_key
         import jwt
 
         options = {

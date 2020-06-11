@@ -12,7 +12,7 @@ class EdxUCursosConfig(AppConfig):
     plugin_app = {
         PluginURLs.CONFIG: {
             ProjectType.LMS: {
-                PluginURLs.NAMESPACE: "edxucursos-login",                
+                PluginURLs.NAMESPACE: "edxucursos-login",
                 PluginURLs.RELATIVE_PATH: "urls",
             }},
         PluginSettings.CONFIG: {
