@@ -13,7 +13,6 @@ from django.urls import reverse
 from django.views.generic.base import View
 from django.http import HttpResponse
 from uchileedxlogin.models import EdxLoginUser, EdxLoginUserCourseRegistration
-from models import EdxUCursosTokens
 from urllib import urlencode
 from itertools import cycle
 from opaque_keys.edx.keys import CourseKey
@@ -58,7 +57,12 @@ class EdxUCursosLoginRedirect(View):
         edxlogin_user = self.get_edxlogin_user(rut)
         if edxlogin_user:
             logger.info('Exists EdxLogin_User: ' + edxlogin_user.user.username)
-            token = self.get_or_create_token(edxlogin_user.user)
+            from rest_framework_jwt.settings import api_settings
+
+            jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+
+            payload = self.get_payload(edxlogin_user.user)
+            token = jwt_encode_handler(payload)
             return HttpResponse(
                 EdxUCursosLoginRedirect.get_callback_url(request, token))
         else:
@@ -118,19 +122,20 @@ class EdxUCursosLoginRedirect(View):
             edxlogin_user.user,
             backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
         )
-
-    def get_or_create_token(self, user):
-        token = str(uuid.uuid4())
-        while EdxUCursosTokens.objects.filter(token=token).exists():
-            token = str(uuid.uuid4())
-        try:
-            edxucursostoken = EdxUCursosTokens.objects.get(user=user)
-            edxucursostoken.token = token
-            edxucursostoken.save()
-        except EdxUCursosTokens.DoesNotExist:
-            EdxUCursosTokens.objects.create(token=token, user=user)
-
         return token
+
+    def get_payload(self, user):
+        from rest_framework_jwt.settings import api_settings
+        from datetime import datetime as dt
+        import datetime
+        payload = {'username': user.username,
+                    'user_id': user.id,
+                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
+
+        if api_settings.JWT_AUDIENCE is not None:
+            payload['aud'] = api_settings.JWT_AUDIENCE
+
+        return payload
 
     @staticmethod
     def get_callback_url(request, token):
@@ -146,13 +151,43 @@ class EdxUCursosCallback(View):
         token = request.GET.get('token', "")
         logger.info('token: ' + token)
         logout(request)
+        import jwt
         try:
-            edxucursostoken = EdxUCursosTokens.objects.get(token=token)
+            payload = self.decode_token(token)
+        except jwt.ExpiredSignatureError:
+            return HttpResponseNotFound('Caducity Token')
+        except Exception:
+            return HttpResponseNotFound('Decoding failure')
+
+        try:
+            login_user = User.objects.get(id=payload['user_id'])
             login(
                 request,
-                edxucursostoken.user,
+                login_user,
                 backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
             )
+            request.session.set_expiry(0)
             return HttpResponseRedirect("/dashboard")
-        except (EdxUCursosTokens.DoesNotExist, Exception):
-            return HttpResponseNotFound('Logging Error: Token no Exists')
+        except (User.DoesNotExist, Exception):
+            return HttpResponseNotFound('Logging Error or User no Exists')
+
+    def decode_token(self, token):
+        from rest_framework_jwt.settings import api_settings
+        from rest_framework_jwt.utils import jwt_get_secret_key 
+        import jwt
+
+        options = {
+            'verify_exp': True,
+            'verify_aud': True
+        }
+        unverified_payload = jwt.decode(token, None, False)
+        secret_key = jwt_get_secret_key(unverified_payload)
+        return jwt.decode(
+            token,
+            api_settings.JWT_PUBLIC_KEY or secret_key,
+            api_settings.JWT_VERIFY,
+            options=options,
+            leeway=api_settings.JWT_LEEWAY,
+            audience=api_settings.JWT_AUDIENCE,
+            algorithms=[api_settings.JWT_ALGORITHM]
+        )

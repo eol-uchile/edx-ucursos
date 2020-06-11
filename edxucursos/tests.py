@@ -17,7 +17,6 @@ from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from student.roles import CourseInstructorRole, CourseStaffRole
-from .models import EdxUCursosTokens
 import re
 import json
 import urlparse
@@ -31,96 +30,10 @@ class TestRedirectView(TestCase):
     def setUp(self):
         self.client_login = Client()
         self.client = Client()
-        self.token = str(uuid.uuid4())
         self.user = UserFactory(
             username='student',
             password='12345',
             email='student@edx.org')
-
-    @patch('requests.get')
-    def test_redirect_already_logged(self, get):
-        from uchileedxlogin.models import EdxLoginUser
-        user = User.objects.create_user(username='testuser', password='123')
-        EdxLoginUser.objects.create(user=user, run='0000000108')
-        EdxUCursosTokens.objects.create(token=self.token, user=user)
-        self.client_login.login(username='testuser', password='123')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "text"])(
-                200,
-                json.dumps(
-                    {
-                        "pers_id": 10,
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        result = self.client_login.get(reverse('edxucursos-login:login'))
-        edxucursostoken = EdxUCursosTokens.objects.get(user=user)
-        self.assertNotEqual(edxucursostoken.token, self.token)
-        self.assertEquals(
-            'http://testserver/edxucursos/callback?token=' +
-            edxucursostoken.token,
-            result._container[0])
-
-    @patch('requests.get')
-    def test_redirect_already_logged_no_token(self, get):
-        from uchileedxlogin.models import EdxLoginUser
-
-        user = User.objects.create_user(username='testuser2', password='123')
-        EdxLoginUser.objects.create(user=user, run='0000000108')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "text"])(
-                200,
-                json.dumps(
-                    {
-                        "pers_id": 10,
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        self.client_login.login(username='testuser2', password='123')
-        result = self.client_login.get(reverse('edxucursos-login:login'))
-        edxucursostoken = EdxUCursosTokens.objects.get(user=user)
-        self.assertEquals(
-            'http://testserver/edxucursos/callback?token=' +
-            edxucursostoken.token,
-            result._container[0])
 
     @patch('requests.get')
     def test_login(self, get):
@@ -159,10 +72,8 @@ class TestRedirectView(TestCase):
             data={
                 'ticket': 'testticket'})
 
-        edxucursostoken = EdxUCursosTokens.objects.get(user=self.user)
-        self.assertEquals(
-            'http://testserver/edxucursos/callback?token=' +
-            edxucursostoken.token,
+        self.assertIn(
+            'http://testserver/edxucursos/callback?token=',
             result._container[0])
 
     @patch('requests.get')
@@ -274,20 +185,31 @@ class TestCallbackView(TestCase):
 
     def test_normal(self):
         from uchileedxlogin.models import EdxLoginUser
+        from rest_framework_jwt.settings import api_settings
+        from datetime import datetime as dt
+        import datetime
+        payload = {'username': self.user.username,
+                    'user_id': self.user.id,
+                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
+        
+        if api_settings.JWT_AUDIENCE is not None:
+            payload['aud'] = api_settings.JWT_AUDIENCE
+        
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        token = jwt_encode_handler(payload)
+
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
-        EdxUCursosTokens.objects.create(token=self.token, user=self.user)
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
-                'token': self.token})
+                'token': token})
         self.assertEquals(result.status_code, 302)
         self.assertEquals(
             result._headers['location'], ('Location', '/dashboard'))
 
-    def test_callback_wrong_or_no_token(self):
+    def test_callback_no_token(self):
         from uchileedxlogin.models import EdxLoginUser
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
-        EdxUCursosTokens.objects.create(token=self.token, user=self.user)
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -295,4 +217,65 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Logging Error: Token no Exists')
+            'Decoding failure')
+
+    def test_callback_wrong_token_data(self):
+        from uchileedxlogin.models import EdxLoginUser
+        from rest_framework_jwt.settings import api_settings
+        from datetime import datetime as dt
+        import datetime
+        payload = {'username': self.user.username,
+                    'user_id': self.user.id,
+                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
+        payload['aud'] = "WRONG_AUD_TEST"
+        
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        token = jwt_encode_handler(payload)
+
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': token})
+        self.assertEquals(result.status_code, 404)
+        self.assertEquals(
+            result._container[0],
+            'Decoding failure')
+    
+    def test_callback_wrong_token(self):
+        from uchileedxlogin.models import EdxLoginUser
+        
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': "asdfghjkl1234567890.123456789asdfghjk.asdfgh123456"})
+        self.assertEquals(result.status_code, 404)
+        self.assertEquals(
+            result._container[0],
+            'Decoding failure')
+
+    def test_callback_expired_token(self):
+        from uchileedxlogin.models import EdxLoginUser
+        from rest_framework_jwt.settings import api_settings
+        from datetime import datetime as dt
+        import datetime
+        payload = {'username': self.user.username,
+                    'user_id': self.user.id,
+                    'exp': dt.utcnow()}
+        if api_settings.JWT_AUDIENCE is not None:
+            payload['aud'] = api_settings.JWT_AUDIENCE
+        
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        token = jwt_encode_handler(payload)
+        import time
+        time.sleep(2)
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': token})
+        self.assertEquals(result.status_code, 404)
+        self.assertEquals(
+            result._container[0],
+            'Caducity Token')
