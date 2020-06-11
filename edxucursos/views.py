@@ -13,11 +13,11 @@ from django.urls import reverse
 from django.views.generic.base import View
 from django.http import HttpResponse
 from uchileedxlogin.models import EdxLoginUser, EdxLoginUserCourseRegistration
+from models import EdxUCursosMapping
 from urllib import urlencode
 from itertools import cycle
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys import InvalidKeyError
-from requests.auth import HTTPBasicAuth
 from courseware.courses import get_course_by_id, get_course_with_access
 from courseware.access import has_access
 from util.json_request import JsonResponse, JsonResponseBadRequest
@@ -55,13 +55,14 @@ class EdxUCursosLoginRedirect(View):
             rut = "0" + rut
         rut = rut + rut_dv
         edxlogin_user = self.get_edxlogin_user(rut)
+        course = self.get_edxucursos_mapping(user_data['grupo'])
         if edxlogin_user:
             logger.info('Exists EdxLogin_User: ' + edxlogin_user.user.username)
             from rest_framework_jwt.settings import api_settings
 
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
-            payload = self.get_payload(edxlogin_user.user)
+            payload = self.get_payload(edxlogin_user.user, course)
             token = jwt_encode_handler(payload)
             return HttpResponse(
                 EdxUCursosLoginRedirect.get_callback_url(request, token))
@@ -113,6 +114,9 @@ class EdxUCursosLoginRedirect(View):
             d = 11 - d
         return str(d)
 
+    def get_edxucursos_mapping(self, data):
+        return '{}/{}/{}/{}/{}'.format(data['base'], data['anno'], data['semestre'], data['codigo'], data['seccion'])
+
     def login_user(self, request, edxlogin_user):
         """
         Get or create the user and log him in.
@@ -124,13 +128,15 @@ class EdxUCursosLoginRedirect(View):
         )
         return token
 
-    def get_payload(self, user):
+    def get_payload(self, user, course):
         from rest_framework_jwt.settings import api_settings
         from datetime import datetime as dt
         import datetime
+        
         payload = {'username': user.username,
                     'user_id': user.id,
-                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
+                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                    'course': course}
 
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
@@ -152,12 +158,23 @@ class EdxUCursosCallback(View):
         logger.info('token: ' + token)
         logout(request)
         import jwt
+        import six
+
         try:
             payload = self.decode_token(token)
         except jwt.ExpiredSignatureError:
             return HttpResponseNotFound('Caducity Token')
         except Exception:
             return HttpResponseNotFound('Decoding failure')
+        
+        if 'course' not in payload:
+            return HttpResponseNotFound('Decoding failure: No Course')
+
+        try:
+            course = EdxUCursosMapping.objects.get(ucurso_course=payload['course'])
+            course_id = six.text_type(course.edx_course)
+        except EdxUCursosMapping.DoesNotExist:
+            return HttpResponseNotFound('EdxUCursosMapping DoesNotExist')
 
         try:
             login_user = User.objects.get(id=payload['user_id'])
@@ -167,7 +184,7 @@ class EdxUCursosCallback(View):
                 backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
             )
             request.session.set_expiry(0)
-            return HttpResponseRedirect("/dashboard")
+            return HttpResponseRedirect("/courses/{}/course/".format(course_id))
         except (User.DoesNotExist, Exception):
             return HttpResponseNotFound('Logging Error or User no Exists')
 
