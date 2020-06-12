@@ -37,6 +37,7 @@ def create_user(user_data):
         username=EdxLoginStaff().generate_username(user_data),
         email=user_data['email'])
 
+
 class TestRedirectView(ModuleStoreTestCase):
     def setUp(self):
         super(TestRedirectView, self).setUp()
@@ -154,8 +155,10 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
         self.assertEquals(result.status_code, 404)
-        self.assertEquals(result._container[0], 'Ticket caducado, reintente nuevamente')
-    
+        self.assertEquals(
+            result._container[0],
+            'Ticket caducado, reintente nuevamente')
+
     @patch('requests.get')
     def test_login_no_exists_course(self, get):
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
@@ -223,39 +226,39 @@ class TestRedirectView(ModuleStoreTestCase):
                                  "organismoDominio": "Universidad de Chile"}]}
 
         get.side_effect = [namedtuple(
-                            "Request",
-                            [
-                                "status_code",
-                                "text"])(
-                            200,
-                            json.dumps(
-                                {
-                                    "pers_id": 10,
-                                    "permisos": {
-                                        "PROFESOR": 1,
-                                        "VER": 1,
-                                        "DEV": 1},
-                                    "lang": "es",
-                                    "theme": None,
-                                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                                    "time": time.time(),
-                                    "mod_id": "eol",
-                                    "gru_id": "curso.372168",
-                                    "grupo": {
-                                            "base": "demo",
-                                            "anno": "2020",
-                                            "semestre": "0",
-                                            "codigo": "CV2020",
-                                            "seccion": "1",
-                                            "nombre": "Curso de prueba Virtual"}})),
-                            namedtuple("Request",
-                                    ["status_code",
-                                    "text"])(200,
-                                            json.dumps({"apellidoPaterno": "TESTLASTNAME",
-                                                        "apellidoMaterno": "TESTLASTNAME",
-                                                        "nombres": "TEST NAME",
-                                                        "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
-                                                        "rut": "0000000108"}))]
+            "Request",
+            [
+                "status_code",
+                "text"])(
+            200,
+            json.dumps(
+                {
+                    "pers_id": 10,
+                    "permisos": {
+                        "PROFESOR": 1,
+                        "VER": 1,
+                        "DEV": 1},
+                    "lang": "es",
+                    "theme": None,
+                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                    "time": time.time(),
+                    "mod_id": "eol",
+                    "gru_id": "curso.372168",
+                    "grupo": {
+                        "base": "demo",
+                        "anno": "2020",
+                        "semestre": "0",
+                        "codigo": "CV2020",
+                        "seccion": "1",
+                        "nombre": "Curso de prueba Virtual"}})),
+            namedtuple("Request",
+                       ["status_code",
+                        "text"])(200,
+                                 json.dumps({"apellidoPaterno": "TESTLASTNAME",
+                                             "apellidoMaterno": "TESTLASTNAME",
+                                             "nombres": "TEST NAME",
+                                             "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
+                                             "rut": "0000000108"}))]
         post.side_effect = [namedtuple("Request",
                                        ["status_code",
                                         "text"])(200,
@@ -286,7 +289,7 @@ class TestRedirectView(ModuleStoreTestCase):
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
             result._container[0])
-    
+
     @patch(
         "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
         side_effect=create_user)
@@ -310,39 +313,39 @@ class TestRedirectView(ModuleStoreTestCase):
                                  "organismoDominio": "Universidad de Chile"}]}
 
         get.side_effect = [namedtuple(
-                            "Request",
-                            [
-                                "status_code",
-                                "text"])(
-                            200,
-                            json.dumps(
-                                {
-                                    "pers_id": 10,
-                                    "permisos": {
-                                        "PROFESOR": 1,
-                                        "VER": 1,
-                                        "DEV": 1},
-                                    "lang": "es",
-                                    "theme": None,
-                                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                                    "time": time.time(),
-                                    "mod_id": "eol",
-                                    "gru_id": "curso.372168",
-                                    "grupo": {
-                                            "base": "demo",
-                                            "anno": "2020",
-                                            "semestre": "0",
-                                            "codigo": "CV2020",
-                                            "seccion": "1",
-                                            "nombre": "Curso de prueba Virtual"}})),
-                            namedtuple("Request",
-                                    ["status_code",
-                                    "text"])(404,
-                                            json.dumps({"apellidoPaterno": "TESTLASTNAME",
-                                                        "apellidoMaterno": "TESTLASTNAME",
-                                                        "nombres": "TEST NAME",
-                                                        "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
-                                                        "rut": "0000000108"}))]
+            "Request",
+            [
+                "status_code",
+                "text"])(
+            200,
+            json.dumps(
+                {
+                    "pers_id": 10,
+                    "permisos": {
+                        "PROFESOR": 1,
+                        "VER": 1,
+                        "DEV": 1},
+                    "lang": "es",
+                    "theme": None,
+                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                    "time": time.time(),
+                    "mod_id": "eol",
+                    "gru_id": "curso.372168",
+                    "grupo": {
+                        "base": "demo",
+                        "anno": "2020",
+                        "semestre": "0",
+                        "codigo": "CV2020",
+                        "seccion": "1",
+                        "nombre": "Curso de prueba Virtual"}})),
+            namedtuple("Request",
+                       ["status_code",
+                        "text"])(404,
+                                 json.dumps({"apellidoPaterno": "TESTLASTNAME",
+                                             "apellidoMaterno": "TESTLASTNAME",
+                                             "nombres": "TEST NAME",
+                                             "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
+                                             "rut": "0000000108"}))]
         post.side_effect = [namedtuple("Request",
                                        ["status_code",
                                         "text"])(200,
@@ -363,6 +366,7 @@ class TestRedirectView(ModuleStoreTestCase):
         self.assertEquals(
             result._container[0],
             'Error con los datos del usuario, por favor contáctese con el soporte tecnico')
+
 
 class TestCallbackView(TestCase):
     def setUp(self):
