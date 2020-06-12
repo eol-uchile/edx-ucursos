@@ -20,6 +20,7 @@ from student.roles import CourseInstructorRole, CourseStaffRole
 from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
 from models import EdxUCursosMapping
 from uchileedxlogin.models import EdxLoginUser
+from uchileedxlogin.views import EdxLoginStaff
 from rest_framework_jwt.settings import api_settings
 from datetime import datetime as dt
 import datetime
@@ -30,19 +31,36 @@ import urlparse
 import time
 import uuid
 
-class TestRedirectView(TestCase):
 
+def create_user(user_data):
+    return User.objects.create_user(
+        username=EdxLoginStaff().generate_username(user_data),
+        email=user_data['email'])
+
+class TestRedirectView(ModuleStoreTestCase):
     def setUp(self):
-        self.client_login = Client()
-        self.client = Client()
-        self.user = UserFactory(
-            username='student',
-            password='12345',
-            email='student@edx.org')
+        super(TestRedirectView, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2020',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('student.models.cc.User.save'):
+            # staff user
+            self.client = Client()
+            self.user = UserFactory(
+                username='testuser3',
+                password='12345',
+                email='student2@edx.org',
+                is_staff=True)
 
     @patch('requests.get')
     def test_login(self, get):
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -98,7 +116,7 @@ class TestRedirectView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Error with ucursos api - ticket')
+            'Error con la api de ucursos (ticket), por favor contáctese con el soporte tecnico')
 
     @patch('requests.get')
     def test_login_caducity_ticket(self, get):
@@ -136,10 +154,14 @@ class TestRedirectView(TestCase):
             data={
                 'ticket': 'testticket'})
         self.assertEquals(result.status_code, 404)
-        self.assertEquals(result._container[0], 'Expired ticket')
-
+        self.assertEquals(result._container[0], 'Ticket caducado, reintente nuevamente')
+    
     @patch('requests.get')
-    def test_login_user_no_exists(self, get):
+    def test_login_no_exists_course(self, get):
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        EdxUCursosMapping.objects.create(
+            edx_course='course-v1:mss+MSS001+2019_2',
+            ucurso_course='demo/2020/0/CV2020/1')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -172,9 +194,175 @@ class TestRedirectView(TestCase):
             reverse('edxucursos-login:login'),
             data={
                 'ticket': 'testticket'})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(result._container[0], 'User not Found')
 
+        self.assertEquals(result.status_code, 404)
+        self.assertEquals(
+            result._container[0],
+            'Error con los parametros: rut de usuario o id del curso, por favor contáctese con el soporte tecnico')
+
+    @patch(
+        "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
+        side_effect=create_user)
+    @patch('requests.post')
+    @patch('requests.get')
+    def test_login_create_user(self, get, post, mock_created_user):
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        data = {"cuentascorp": [{"cuentaCorp": "avilio.perez@ug.uchile.cl",
+                                 "tipoCuenta": "EMAIL",
+                                 "organismoDominio": "ug.uchile.cl"},
+                                {"cuentaCorp": "avilio.perez@uchile.cl",
+                                 "tipoCuenta": "EMAIL",
+                                 "organismoDominio": "uchile.cl"},
+                                {"cuentaCorp": "avilio.perez@u.uchile.cl",
+                                 "tipoCuenta": "EMAIL",
+                                 "organismoDominio": "u.uchile.cl"},
+                                {"cuentaCorp": "avilio.perez",
+                                 "tipoCuenta": "CUENTA PASAPORTE",
+                                 "organismoDominio": "Universidad de Chile"}]}
+
+        get.side_effect = [namedtuple(
+                            "Request",
+                            [
+                                "status_code",
+                                "text"])(
+                            200,
+                            json.dumps(
+                                {
+                                    "pers_id": 10,
+                                    "permisos": {
+                                        "PROFESOR": 1,
+                                        "VER": 1,
+                                        "DEV": 1},
+                                    "lang": "es",
+                                    "theme": None,
+                                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                                    "time": time.time(),
+                                    "mod_id": "eol",
+                                    "gru_id": "curso.372168",
+                                    "grupo": {
+                                            "base": "demo",
+                                            "anno": "2020",
+                                            "semestre": "0",
+                                            "codigo": "CV2020",
+                                            "seccion": "1",
+                                            "nombre": "Curso de prueba Virtual"}})),
+                            namedtuple("Request",
+                                    ["status_code",
+                                    "text"])(200,
+                                            json.dumps({"apellidoPaterno": "TESTLASTNAME",
+                                                        "apellidoMaterno": "TESTLASTNAME",
+                                                        "nombres": "TEST NAME",
+                                                        "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
+                                                        "rut": "0000000108"}))]
+        post.side_effect = [namedtuple("Request",
+                                       ["status_code",
+                                        "text"])(200,
+                                                 json.dumps(data)),
+                            namedtuple("Request",
+                                       ["status_code",
+                                        "text"])(200,
+                                                 json.dumps({"emails": [{"rut": "0000000108",
+                                                                         "email": "test@test.test",
+                                                                         "codigoTipoEmail": "1",
+                                                                         "nombreTipoEmail": "PRINCIPAL"}]}))]
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertEquals(result.status_code, 200)
+        self.assertEqual(
+            mock_created_user.call_args_list[0][0][0],
+            {
+                'username': 'avilio.perez',
+                'apellidoMaterno': 'TESTLASTNAME',
+                'nombres': 'TEST NAME',
+                'apellidoPaterno': 'TESTLASTNAME',
+                'nombreCompleto': 'TEST NAME TESTLASTNAME TESTLASTNAME',
+                'rut': '0000000108',
+                'email': 'test@test.test'})
+        self.assertIn(
+            'http://testserver/edxucursos/callback?token=',
+            result._container[0])
+    
+    @patch(
+        "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
+        side_effect=create_user)
+    @patch('requests.post')
+    @patch('requests.get')
+    def test_login_fail_create_user(self, get, post, mock_created_user):
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        data = {"cuentascorp": [{"cuentaCorp": "avilio.perez@ug.uchile.cl",
+                                 "tipoCuenta": "EMAIL",
+                                 "organismoDominio": "ug.uchile.cl"},
+                                {"cuentaCorp": "avilio.perez@uchile.cl",
+                                 "tipoCuenta": "EMAIL",
+                                 "organismoDominio": "uchile.cl"},
+                                {"cuentaCorp": "avilio.perez@u.uchile.cl",
+                                 "tipoCuenta": "EMAIL",
+                                 "organismoDominio": "u.uchile.cl"},
+                                {"cuentaCorp": "avilio.perez",
+                                 "tipoCuenta": "CUENTA PASAPORTE",
+                                 "organismoDominio": "Universidad de Chile"}]}
+
+        get.side_effect = [namedtuple(
+                            "Request",
+                            [
+                                "status_code",
+                                "text"])(
+                            200,
+                            json.dumps(
+                                {
+                                    "pers_id": 10,
+                                    "permisos": {
+                                        "PROFESOR": 1,
+                                        "VER": 1,
+                                        "DEV": 1},
+                                    "lang": "es",
+                                    "theme": None,
+                                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                                    "time": time.time(),
+                                    "mod_id": "eol",
+                                    "gru_id": "curso.372168",
+                                    "grupo": {
+                                            "base": "demo",
+                                            "anno": "2020",
+                                            "semestre": "0",
+                                            "codigo": "CV2020",
+                                            "seccion": "1",
+                                            "nombre": "Curso de prueba Virtual"}})),
+                            namedtuple("Request",
+                                    ["status_code",
+                                    "text"])(404,
+                                            json.dumps({"apellidoPaterno": "TESTLASTNAME",
+                                                        "apellidoMaterno": "TESTLASTNAME",
+                                                        "nombres": "TEST NAME",
+                                                        "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
+                                                        "rut": "0000000108"}))]
+        post.side_effect = [namedtuple("Request",
+                                       ["status_code",
+                                        "text"])(200,
+                                                 json.dumps(data)),
+                            namedtuple("Request",
+                                       ["status_code",
+                                        "text"])(200,
+                                                 json.dumps({"emails": [{"rut": "0000000108",
+                                                                         "email": "test@test.test",
+                                                                         "codigoTipoEmail": "1",
+                                                                         "nombreTipoEmail": "PRINCIPAL"}]}))]
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertEquals(result.status_code, 404)
+        self.assertEquals(
+            result._container[0],
+            'Error con los datos del usuario, por favor contáctese con el soporte tecnico')
 
 class TestCallbackView(TestCase):
     def setUp(self):
@@ -220,7 +408,7 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Decoding failure')
+            'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_wrong_token_data(self):
         payload = {'username': self.user.username,
@@ -240,7 +428,7 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Decoding failure')
+            'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_wrong_token(self):
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
@@ -251,7 +439,7 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Decoding failure')
+            'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_expired_token(self):
         payload = {'username': self.user.username,
@@ -272,7 +460,7 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Caducity Token')
+            'Ticket caducado, reintente nuevamente')
 
     def test_callback_no_course(self):
         payload = {'username': self.user.username, 'user_id': self.user.id, 'exp': dt.utcnow(
@@ -292,7 +480,7 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'Decoding failure: No Course')
+            'Error en la decoficación (parametro: curso), reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_no_mapping_course(self):
         payload = {'username': self.user.username,
@@ -314,4 +502,4 @@ class TestCallbackView(TestCase):
         self.assertEquals(result.status_code, 404)
         self.assertEquals(
             result._container[0],
-            'EdxUCursosMapping DoesNotExist')
+            'El curso no se ha vinculado con un curso de eol, por favor contáctese con el soporte tecnico')
