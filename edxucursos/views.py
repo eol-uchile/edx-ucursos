@@ -47,7 +47,6 @@ class EdxUCursosLoginRedirect(View):
     def get(self, request):
         ticket = request.GET.get('ticket', "")
         logger.info('ticket: ' + ticket)
-        logout(request)
         user_data = self.get_data_ticket(ticket)
         if user_data['result'] == 'error':
             logger.info('Data error')
@@ -237,8 +236,7 @@ class EdxUCursosCallback(View):
     def get(self, request):
         token = request.GET.get('token', "")
         logger.info('token: ' + token)
-        logout(request)
-        
+
         #decode token
         try:
             payload = self.decode_token(token)
@@ -266,11 +264,13 @@ class EdxUCursosCallback(View):
 
         try:
             login_user = User.objects.get(id=payload['user_id'])
-            login(
-                request,
-                login_user,
-                backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
-            )
+            if request.user.is_anonymous or request.user.id != login_user.id:
+                logout(request)
+                login(
+                    request,
+                    login_user,
+                    backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
+                )
             request.session.set_expiry(0)
             return HttpResponseRedirect(
                 "/courses/{}/course/".format(course_id))

@@ -391,6 +391,10 @@ class TestCallbackView(TestCase):
         self.client = Client()
         self.token = str(uuid.uuid4())
         self.user = UserFactory(
+            username='testuser',
+            password='12345',
+            email='testuser@edx.org')
+        self.student = UserFactory(
             username='student',
             password='12345',
             email='student@edx.org')
@@ -428,7 +432,6 @@ class TestCallbackView(TestCase):
         """
             Testing when token is empty
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -450,8 +453,6 @@ class TestCallbackView(TestCase):
 
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
-
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -465,7 +466,6 @@ class TestCallbackView(TestCase):
         """
             Testing when token is wrong
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -489,7 +489,6 @@ class TestCallbackView(TestCase):
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
         time.sleep(2)
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -511,8 +510,6 @@ class TestCallbackView(TestCase):
 
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
-
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -536,8 +533,6 @@ class TestCallbackView(TestCase):
 
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
-
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
             data={
@@ -546,3 +541,61 @@ class TestCallbackView(TestCase):
         self.assertEquals(
             result._container[0],
             'El curso no se ha vinculado con un curso de eol, por favor contáctese con el soporte tecnico')
+
+    def test_callback_user_logged(self):
+        """
+            Test when user is already logged
+        """
+        self.client.login(username='student', password='12345')
+        payload = {'username': self.user.username,
+                   'user_id': self.student.id,
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'course': 'demo/2020/0/CV2020/1'}
+
+        if api_settings.JWT_AUDIENCE is not None:
+            payload['aud'] = api_settings.JWT_AUDIENCE
+
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        token = jwt_encode_handler(payload)
+        EdxUCursosMapping.objects.create(
+            edx_course='course-v1:mss+MSS001+2019_2',
+            ucurso_course='demo/2020/0/CV2020/1')
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': token})
+        self.assertEquals(result.status_code, 302)
+        self.assertEquals(
+            result._headers['location'],
+            ('Location',
+             '/courses/course-v1:mss+MSS001+2019_2/course/'))
+
+    def test_callback_different_user_logged(self):
+        """
+            Test when another user is already logged
+        """
+        self.client.login(username='student', password='12345')
+        payload = {'username': self.user.username,
+                   'user_id': self.user.id,
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'course': 'demo/2020/0/CV2020/1'}
+
+        if api_settings.JWT_AUDIENCE is not None:
+            payload['aud'] = api_settings.JWT_AUDIENCE
+
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        token = jwt_encode_handler(payload)
+
+        EdxUCursosMapping.objects.create(
+            edx_course='course-v1:mss+MSS001+2019_2',
+            ucurso_course='demo/2020/0/CV2020/1')
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': token})
+        
+        self.assertEquals(result.status_code, 302)
+        self.assertEquals(
+            result._headers['location'],
+            ('Location',
+             '/courses/course-v1:mss+MSS001+2019_2/course/'))
