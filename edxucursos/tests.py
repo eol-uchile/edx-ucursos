@@ -58,6 +58,9 @@ class TestRedirectView(ModuleStoreTestCase):
 
     @patch('requests.get')
     def test_login(self, get):
+        """
+            Test EdxUCursosLoginRedirect normal procedure
+        """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
@@ -101,6 +104,9 @@ class TestRedirectView(ModuleStoreTestCase):
 
     @patch('requests.get')
     def test_login_wrong_or_none_ticket(self, get):
+        """
+            Testing when ticket is wrong or none
+        """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
@@ -121,6 +127,9 @@ class TestRedirectView(ModuleStoreTestCase):
 
     @patch('requests.get')
     def test_login_caducity_ticket(self, get):
+        """
+            Testing when ticket is expired
+        """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
@@ -161,6 +170,9 @@ class TestRedirectView(ModuleStoreTestCase):
 
     @patch('requests.get')
     def test_login_no_exists_course(self, get):
+        """
+            Testing when course no exists
+        """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosMapping.objects.create(
             edx_course='course-v1:mss+MSS001+2019_2',
@@ -209,6 +221,9 @@ class TestRedirectView(ModuleStoreTestCase):
     @patch('requests.post')
     @patch('requests.get')
     def test_login_create_user(self, get, post, mock_created_user):
+        """
+            Testing when edxlogin_user no exists
+        """
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -296,6 +311,9 @@ class TestRedirectView(ModuleStoreTestCase):
     @patch('requests.post')
     @patch('requests.get')
     def test_login_fail_create_user(self, get, post, mock_created_user):
+        """
+            Testing when fail in create user
+        """
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -378,6 +396,9 @@ class TestCallbackView(TestCase):
             email='student@edx.org')
 
     def test_normal(self):
+        """
+            Test EdxUCursosCallback normal procedure
+        """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
@@ -404,6 +425,9 @@ class TestCallbackView(TestCase):
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
 
     def test_callback_no_token(self):
+        """
+            Testing when token is empty
+        """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
@@ -415,6 +439,9 @@ class TestCallbackView(TestCase):
             'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_wrong_token_data(self):
+        """
+            Testing when data token is wrong
+        """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
@@ -435,6 +462,9 @@ class TestCallbackView(TestCase):
             'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_wrong_token(self):
+        """
+            Testing when token is wrong
+        """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         result = self.client.get(
             reverse('edxucursos-login:callback'),
@@ -446,6 +476,9 @@ class TestCallbackView(TestCase):
             'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_expired_token(self):
+        """
+            Testing when token is expired
+        """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow(),
@@ -467,6 +500,9 @@ class TestCallbackView(TestCase):
             'Ticket caducado, reintente nuevamente')
 
     def test_callback_no_course(self):
+        """
+            Testing when course data no exists
+        """
         payload = {'username': self.user.username, 'user_id': self.user.id, 'exp': dt.utcnow(
         ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
 
@@ -487,6 +523,9 @@ class TestCallbackView(TestCase):
             'Error en la decoficación (parametro: curso), reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_no_mapping_course(self):
+        """
+            Testing when ucurse_id no exists
+        """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
                    'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),

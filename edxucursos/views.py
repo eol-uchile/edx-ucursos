@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 
 
 class EdxUCursosLoginRedirect(View):
+    """
+        Return a url with user token to log in
+    """
     def get(self, request):
         ticket = request.GET.get('ticket', "")
         logger.info('ticket: ' + ticket)
@@ -85,6 +88,9 @@ class EdxUCursosLoginRedirect(View):
                 'Error con los datos del usuario, por favor contáctese con el soporte tecnico')
 
     def get_data_ticket(self, ticket):
+        """
+            Get user data through the ticket
+        """
         parameters = {
             'ticket': ticket
         }
@@ -101,12 +107,18 @@ class EdxUCursosLoginRedirect(View):
         return {'result': 'error'}
 
     def verify_caducity(self, data):
+        """
+            Check if ticket is expired
+        """
         aux_time = time.time()
         if (aux_time - data["time"]) > 60:
             return True
         return False
 
     def digito_verificador(self, run):
+        """
+            Return rut check digit
+        """
         rut = reversed(map(int, run))
         m = [2, 3, 4, 5, 6, 7]
 
@@ -120,6 +132,9 @@ class EdxUCursosLoginRedirect(View):
         return str(d)
 
     def get_edxucursos_mapping(self, data):
+        """
+            Return id_ucursos 
+        """
         return '{}/{}/{}/{}/{}'.format(data['base'],
                                        data['anno'],
                                        data['semestre'],
@@ -128,7 +143,7 @@ class EdxUCursosLoginRedirect(View):
 
     def login_user(self, request, edxlogin_user):
         """
-        Get or create the user and log him in.
+            Login user
         """
         login(
             request,
@@ -138,6 +153,9 @@ class EdxUCursosLoginRedirect(View):
         return token
 
     def get_payload(self, user, course):
+        """
+            Create payload with user data to create auth token
+        """
         payload = {'username': user.username, 'user_id': user.id, 'exp': dt.utcnow(
         ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME), 'course': course}
 
@@ -147,15 +165,15 @@ class EdxUCursosLoginRedirect(View):
         return payload
 
     def validate_data(self, rut, course):
-        # validacion de los run
+        """
+            Verify if rut and course are correct
+        """
         try:
             if not EdxLoginStaff().validarRut(rut):
                 return False
         except Exception:
             return False
 
-        # validaciones de otros campos
-        # valida curso
         try:
             course = EdxUCursosMapping.objects.get(
                 ucurso_course=course)
@@ -163,13 +181,16 @@ class EdxUCursosLoginRedirect(View):
         except EdxUCursosMapping.DoesNotExist:
             return False
 
-        # valida si existe el curso
+        # verify if exists course
         if not EdxLoginStaff().validate_course(course_id):
             return False
 
         return course
 
     def enroll_or_create_user(self, run, course, mode):
+        """
+            Get o create edxlogin_user and enroll to course
+        """
         with transaction.atomic():
             try:
                 edxlogin_user = EdxLoginUser.objects.get(run=run)
@@ -191,6 +212,11 @@ class EdxUCursosLoginRedirect(View):
         return None
 
     def get_mode(self, data):
+        """
+            Return mode data.
+            audit == Profesor
+            honor == Estudiante
+        """
         if "PROFESOR" in data and data["PROFESOR"] == 1:
             return "audit"
         return "honor"
@@ -205,10 +231,15 @@ class EdxUCursosLoginRedirect(View):
 
 
 class EdxUCursosCallback(View):
+    """
+        Login user if token is valid
+    """
     def get(self, request):
         token = request.GET.get('token', "")
         logger.info('token: ' + token)
         logout(request)
+        
+        #decode token
         try:
             payload = self.decode_token(token)
         except jwt.ExpiredSignatureError:
@@ -219,12 +250,12 @@ class EdxUCursosCallback(View):
             logger.info('Decoding failure')
             return HttpResponseNotFound(
                 'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
-
+        #verify if course parameter exists
         if 'course' not in payload:
             logger.info('Decoding failure: No Course')
             return HttpResponseNotFound(
                 'Error en la decoficación (parametro: curso), reintente nuevamente o contáctese con el soporte tecnico')
-
+        #verify course_id exists
         try:
             course = EdxUCursosMapping.objects.get(
                 ucurso_course=payload['course'])
@@ -248,6 +279,9 @@ class EdxUCursosCallback(View):
                 'Logging Error, reintente nuevamente o contáctese con el soporte tecnico')
 
     def decode_token(self, token):
+        """
+            Decode token
+        """
         options = {
             'verify_exp': True,
             'verify_aud': True
