@@ -14,8 +14,8 @@ from django.views.generic.base import View
 from django.http import HttpResponse
 from uchileedxlogin.models import EdxLoginUser, EdxLoginUserCourseRegistration
 from uchileedxlogin.views import EdxLoginStaff
-from models import EdxUCursosMapping
-from urllib import urlencode
+from .models import EdxUCursosMapping
+from urllib.parse import urlencode
 from itertools import cycle
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys import InvalidKeyError
@@ -118,7 +118,7 @@ class EdxUCursosLoginRedirect(View):
         """
             Return rut check digit
         """
-        rut = reversed(map(int, run))
+        rut = reversed(list(map(int, run)))
         m = [2, 3, 4, 5, 6, 7]
 
         d = sum([n * m[i % 6] for i, n in enumerate(rut)])

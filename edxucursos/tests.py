@@ -8,8 +8,7 @@ from django.test import Client
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
-from urlparse import parse_qs
-from openedx.core.lib.tests.tools import assert_true
+from urllib.parse import parse_qs
 from opaque_keys.edx.locator import CourseLocator
 from student.tests.factories import CourseEnrollmentAllowedFactory, UserFactory, CourseEnrollmentFactory
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
@@ -18,7 +17,7 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from student.roles import CourseInstructorRole, CourseStaffRole
 from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
-from models import EdxUCursosMapping
+from .models import EdxUCursosMapping
 from uchileedxlogin.models import EdxLoginUser
 from uchileedxlogin.views import EdxLoginStaff
 from rest_framework_jwt.settings import api_settings
@@ -27,7 +26,7 @@ import datetime
 import time
 import re
 import json
-import urlparse
+import urllib.parse
 import time
 import uuid
 
@@ -100,7 +99,7 @@ class TestRedirectView(ModuleStoreTestCase):
 
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
-            result._container[0])
+            result._container[0].decode())
 
     @patch('requests.get')
     def test_login_wrong_or_none_ticket(self, get):
@@ -120,9 +119,9 @@ class TestRedirectView(ModuleStoreTestCase):
             reverse('edxucursos-login:login'),
             data={
                 'ticket': 'wrongticket'})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error con la api de ucursos (ticket), por favor contáctese con el soporte tecnico')
 
     @patch('requests.get')
@@ -163,9 +162,9 @@ class TestRedirectView(ModuleStoreTestCase):
             reverse('edxucursos-login:login'),
             data={
                 'ticket': 'testticket'})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Ticket caducado, reintente nuevamente')
 
     @patch('requests.get')
@@ -210,9 +209,9 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error con los parametros: rut de usuario o id del curso, por favor contáctese con el soporte tecnico')
 
     @patch(
@@ -290,7 +289,7 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEquals(result.status_code, 200)
+        self.assertEqual(result.status_code, 200)
         self.assertEqual(
             mock_created_user.call_args_list[0][0][0],
             {
@@ -303,7 +302,7 @@ class TestRedirectView(ModuleStoreTestCase):
                 'email': 'test@test.test'})
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
-            result._container[0])
+            result._container[0].decode())
 
     @patch(
         "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
@@ -380,9 +379,9 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error con los datos del usuario, por favor contáctese con el soporte tecnico')
 
 
@@ -422,8 +421,8 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
-        self.assertEquals(result.status_code, 302)
-        self.assertEquals(
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(
             result._headers['location'],
             ('Location',
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
@@ -436,9 +435,9 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': ""})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_wrong_token_data(self):
@@ -457,9 +456,9 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_wrong_token(self):
@@ -470,9 +469,9 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': "asdfghjkl1234567890.123456789asdfghjk.asdfgh123456"})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_expired_token(self):
@@ -493,9 +492,9 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Ticket caducado, reintente nuevamente')
 
     def test_callback_no_course(self):
@@ -514,9 +513,9 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'Error en la decoficación (parametro: curso), reintente nuevamente o contáctese con el soporte tecnico')
 
     def test_callback_no_mapping_course(self):
@@ -537,9 +536,9 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
-        self.assertEquals(result.status_code, 404)
-        self.assertEquals(
-            result._container[0],
+        self.assertEqual(result.status_code, 404)
+        self.assertEqual(
+            result._container[0].decode(),
             'El curso no se ha vinculado con un curso de eol, por favor contáctese con el soporte tecnico')
 
     def test_callback_user_logged(self):
@@ -564,8 +563,8 @@ class TestCallbackView(TestCase):
             reverse('edxucursos-login:callback'),
             data={
                 'token': token})
-        self.assertEquals(result.status_code, 302)
-        self.assertEquals(
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(
             result._headers['location'],
             ('Location',
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
@@ -594,8 +593,8 @@ class TestCallbackView(TestCase):
             data={
                 'token': token})
         
-        self.assertEquals(result.status_code, 302)
-        self.assertEquals(
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(
             result._headers['location'],
             ('Location',
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
