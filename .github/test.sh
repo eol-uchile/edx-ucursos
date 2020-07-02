@@ -1,5 +1,5 @@
 #!/bin/dash
-pip install -e git+https://github.com/eol-uchile/uchileedxlogin@2cbd7a788833040385f8f9f12e557b790c2f0a53#egg=uchileedxlogin
+pip install -e git+https://github.com/eol-uchile/uchileedxlogin@a11973e7625e1a3e66103ccad79c26103381988a#egg=uchileedxlogin
 pip install -e /openedx/requirements/edx-ucursos
 
 cd /openedx/requirements/edx-ucursos/edxucursos
