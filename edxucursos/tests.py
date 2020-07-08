@@ -120,9 +120,9 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'wrongticket'})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error con la api de ucursos (ticket), por favor contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error con la api de ucursos (ticket)' in
+            result._container[0].decode())
 
     @patch('requests.get')
     def test_login_caducity_ticket(self, get):
@@ -163,9 +163,9 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Ticket caducado, reintente nuevamente')
+        self.assertTrue(
+            'Ticket caducado, reintente nuevamente' in
+            result._container[0].decode())
 
     @patch('requests.get')
     def test_login_no_exists_course(self, get):
@@ -210,9 +210,9 @@ class TestRedirectView(ModuleStoreTestCase):
                 'ticket': 'testticket'})
 
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error con los parametros: rut de usuario o id del curso, por favor contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error con los parametros' in
+            result._container[0].decode())
 
     @patch(
         "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
@@ -380,9 +380,9 @@ class TestRedirectView(ModuleStoreTestCase):
                 'ticket': 'testticket'})
 
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error con los datos del usuario, por favor contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error con los datos del usuario' in
+            result._container[0].decode())
 
 
 class TestCallbackView(TestCase):
@@ -436,9 +436,9 @@ class TestCallbackView(TestCase):
             data={
                 'token': ""})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error en la decoficación' in
+            result._container[0].decode())
 
     def test_callback_wrong_token_data(self):
         """
@@ -457,9 +457,9 @@ class TestCallbackView(TestCase):
             data={
                 'token': token})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error en la decoficación' in
+            result._container[0].decode())
 
     def test_callback_wrong_token(self):
         """
@@ -470,9 +470,9 @@ class TestCallbackView(TestCase):
             data={
                 'token': "asdfghjkl1234567890.123456789asdfghjk.asdfgh123456"})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error en la decoficación' in
+            result._container[0].decode())
 
     def test_callback_expired_token(self):
         """
@@ -493,9 +493,9 @@ class TestCallbackView(TestCase):
             data={
                 'token': token})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Ticket caducado, reintente nuevamente')
+        self.assertTrue(
+            'Ticket caducado' in
+            result._container[0].decode())
 
     def test_callback_no_course(self):
         """
@@ -514,9 +514,9 @@ class TestCallbackView(TestCase):
             data={
                 'token': token})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'Error en la decoficación (parametro: curso), reintente nuevamente o contáctese con el soporte tecnico')
+        self.assertTrue(
+            'Error en la decoficación (parametro: curso)' in
+            result._container[0].decode())
 
     def test_callback_no_mapping_course(self):
         """
@@ -537,9 +537,9 @@ class TestCallbackView(TestCase):
             data={
                 'token': token})
         self.assertEqual(result.status_code, 404)
-        self.assertEqual(
-            result._container[0].decode(),
-            'El curso no se ha vinculado con un curso de eol, por favor contáctese con el soporte tecnico')
+        self.assertTrue(
+            'El curso no se ha vinculado con un curso de eol' in
+            result._container[0].decode())
 
     def test_callback_user_logged(self):
         """
