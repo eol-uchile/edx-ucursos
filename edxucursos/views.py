@@ -38,7 +38,7 @@ import jwt
 import six
 
 logger = logging.getLogger(__name__)
-
+msg_error = "contáctese al correo eol-ayuda@uchile.cl adjuntando el número del error"
 
 class EdxUCursosLoginRedirect(View):
     """
@@ -49,15 +49,17 @@ class EdxUCursosLoginRedirect(View):
         logger.info('ticket: ' + ticket)
         user_data = self.get_data_ticket(ticket)
         if user_data['result'] == 'error':
-            logger.info('Data error')
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + '- Data error')
             logger.info(user_data)
             return HttpResponseNotFound(
-                'Error con la api de ucursos (ticket), por favor contáctese con el soporte tecnico')
+                '(Error '+ id_error +') Error con la api de ucursos (ticket), por favor '+ msg_error)
 
         if self.verify_caducity(user_data):
-            logger.info('Ticket caducado: ' + ticket)
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + ' - Ticket caducado: ' + ticket)
             return HttpResponseNotFound(
-                'Ticket caducado, reintente nuevamente')
+                '(Error '+ id_error +') Ticket caducado, reintente nuevamente o '+ msg_error)
 
         rut = str(user_data['pers_id'])
         rut_dv = self.digito_verificador(rut)
@@ -68,8 +70,10 @@ class EdxUCursosLoginRedirect(View):
         u_course = self.get_edxucursos_mapping(user_data['grupo'])
         mapp_course = self.validate_data(rut, u_course)
         if not mapp_course:
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + '- Error con los parametros: rut de usuario o id del curso')
             return HttpResponseNotFound(
-                'Error con los parametros: rut de usuario o id del curso, por favor contáctese con el soporte tecnico')
+                '(Error '+ id_error +') Error con los parametros: rut de usuario o id del curso, por favor '+ msg_error)
 
         mode = self.get_mode(user_data["permisos"])
         edxlogin_user = self.enroll_or_create_user(rut, mapp_course, mode)
@@ -82,9 +86,10 @@ class EdxUCursosLoginRedirect(View):
             return HttpResponse(
                 EdxUCursosLoginRedirect.get_callback_url(request, token))
         else:
-            logger.info('Error creating user')
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + ' - Error creating user')
             return HttpResponseNotFound(
-                'Error con los datos del usuario, por favor contáctese con el soporte tecnico')
+                '(Error '+ id_error +') Error con los datos del usuario, por favor '+ msg_error)
 
     def get_data_ticket(self, ticket):
         """
@@ -241,26 +246,31 @@ class EdxUCursosCallback(View):
         try:
             payload = self.decode_token(token)
         except jwt.ExpiredSignatureError:
-            logger.info('Caducity Ticket')
+            id_error = str(uuid.uuid4())
+            logger.error(id_error +' - Caducity Ticket')
             return HttpResponseNotFound(
-                'Ticket caducado, reintente nuevamente')
+                '(Error '+ id_error +') Ticket caducado, reintente nuevamente o '+ msg_error)
         except Exception:
-            logger.info('Decoding failure')
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + ' - Decoding failure')
             return HttpResponseNotFound(
-                'Error en la decoficación, reintente nuevamente o contáctese con el soporte tecnico')
+                '(Error '+ id_error +') Error en la decoficación, reintente nuevamente o '+ msg_error)
         #verify if course parameter exists
         if 'course' not in payload:
-            logger.info('Decoding failure: No Course')
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + ' - Decoding failure: No Course')
             return HttpResponseNotFound(
-                'Error en la decoficación (parametro: curso), reintente nuevamente o contáctese con el soporte tecnico')
+                '(Error '+ id_error +') Error en la decoficación (parametro: curso), reintente nuevamente o '+ msg_error)
         #verify course_id exists
         try:
             course = EdxUCursosMapping.objects.get(
                 ucurso_course=payload['course'])
             course_id = six.text_type(course.edx_course)
         except EdxUCursosMapping.DoesNotExist:
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + ' - El curso no se ha vinculado con un curso de eol')
             return HttpResponseNotFound(
-                'El curso no se ha vinculado con un curso de eol, por favor contáctese con el soporte tecnico')
+                '(Error '+ id_error +') El curso no se ha vinculado con un curso de eol, por favor '+ msg_error)
 
         try:
             login_user = User.objects.get(id=payload['user_id'])
@@ -275,8 +285,10 @@ class EdxUCursosCallback(View):
             return HttpResponseRedirect(
                 "/courses/{}/course/".format(course_id))
         except (User.DoesNotExist, Exception):
+            id_error = str(uuid.uuid4())
+            logger.error(id_error + ' - Logging Error')
             return HttpResponseNotFound(
-                'Logging Error, reintente nuevamente o contáctese con el soporte tecnico')
+                '(Error '+ id_error +') Logging Error, reintente nuevamente o '+ msg_error)
 
     def decode_token(self, token):
         """
