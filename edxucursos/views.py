@@ -80,7 +80,6 @@ class EdxUCursosLoginRedirect(View):
 
         if edxlogin_user:
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-
             payload = self.get_payload(edxlogin_user.user, u_course)
             token = jwt_encode_handler(payload)
             return HttpResponse(
@@ -230,7 +229,10 @@ class EdxUCursosLoginRedirect(View):
         """
         Get the callback url
         """
-        url = request.build_absolute_uri(reverse('edxucursos-login:callback'))
+        if settings.EDXCURSOS_DOMAIN != "":
+            url = '{}{}'.format(settings.EDXCURSOS_DOMAIN, reverse('edxucursos-login:callback'))
+        else:
+            url = request.build_absolute_uri(reverse('edxucursos-login:callback'))
         return '{}?token={}'.format(url, token)
 
 

@@ -22,6 +22,7 @@ from uchileedxlogin.models import EdxLoginUser
 from uchileedxlogin.views import EdxLoginStaff
 from rest_framework_jwt.settings import api_settings
 from datetime import datetime as dt
+from django.test.utils import override_settings
 import datetime
 import time
 import re
@@ -384,6 +385,52 @@ class TestRedirectView(ModuleStoreTestCase):
             'Error con los datos del usuario' in
             result._container[0].decode())
 
+    @override_settings(EDXCURSOS_DOMAIN="http://change.domain.com")
+    @patch('requests.get')
+    def test_login_with_domain(self, get):
+        """
+            Test EdxUCursosLoginRedirect normal procedure
+        """
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertIn(
+            'http://change.domain.com/edxucursos/callback?token=',
+            result._container[0].decode())
 
 class TestCallbackView(TestCase):
     def setUp(self):
