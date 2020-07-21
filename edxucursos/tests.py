@@ -385,11 +385,11 @@ class TestRedirectView(ModuleStoreTestCase):
             'Error con los datos del usuario' in
             result._container[0].decode())
 
-    @override_settings(EDXCURSOS_DOMAIN="http://change.domain.com")
+    @override_settings(EDXUCURSOS_DOMAIN="http://change.domain.com")
     @patch('requests.get')
     def test_login_with_domain(self, get):
         """
-            Test EdxUCursosLoginRedirect normal procedure
+            Test EdxUCursosLoginRedirect normal procedure with domain settings
         """
         EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosMapping.objects.create(
@@ -432,6 +432,196 @@ class TestRedirectView(ModuleStoreTestCase):
             'http://change.domain.com/edxucursos/callback?token=',
             result._container[0].decode())
 
+    @patch('requests.get')
+    def test_login_with_passport(self, get):
+        """
+            Test EdxUCursosLoginRedirect with passport
+        """
+        EdxLoginUser.objects.create(user=self.user, run='PABC112233')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "id_externo":"PABC112233",
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertIn(
+            'http://testserver/edxucursos/callback?token=',
+            result._container[0].decode())
+
+    @patch('requests.get')
+    def test_login_with_wrong_passport(self, get):
+        """
+            Test EdxUCursosLoginRedirect with wrong passport
+        """
+        EdxLoginUser.objects.create(user=self.user, run='PABC1122')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "id_externo":"P112",
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertEqual(result.status_code, 404)
+        self.assertTrue(
+            'Error con los parametros' in
+            result._container[0].decode())
+
+    @patch('requests.get')
+    def test_login_with_CG_account(self, get):
+        """
+            Test EdxUCursosLoginRedirect with CG account
+        """
+        EdxLoginUser.objects.create(user=self.user, run='CG00112233')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "id_externo":"CG00112233",
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertIn(
+            'http://testserver/edxucursos/callback?token=',
+            result._container[0].decode())
+
+    @patch('requests.get')
+    def test_login_with_CG_account_wrong(self, get):
+        """
+            Test EdxUCursosLoginRedirect with wrong CG account
+        """
+        EdxLoginUser.objects.create(user=self.user, run='CG00112233')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 10,
+                        "id_externo":"CG001122",
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertEqual(result.status_code, 404)
+        self.assertTrue(
+            'Error con los parametros' in
+            result._container[0].decode())
+
 class TestCallbackView(TestCase):
     def setUp(self):
         self.client = Client()
@@ -451,7 +641,7 @@ class TestCallbackView(TestCase):
         """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
                    'course': 'demo/2020/0/CV2020/1'}
 
         if api_settings.JWT_AUDIENCE is not None:
@@ -493,7 +683,7 @@ class TestCallbackView(TestCase):
         """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
                    'course': 'demo/2020/0/CV2020/1'}
         payload['aud'] = "WRONG_AUD_TEST"
 
@@ -549,7 +739,7 @@ class TestCallbackView(TestCase):
             Testing when course data no exists
         """
         payload = {'username': self.user.username, 'user_id': self.user.id, 'exp': dt.utcnow(
-        ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME)}
+        ) + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME)}
 
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
@@ -571,7 +761,7 @@ class TestCallbackView(TestCase):
         """
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
                    'course': 'test/2020/0/CV2020/1'}
 
         if api_settings.JWT_AUDIENCE is not None:
@@ -595,7 +785,7 @@ class TestCallbackView(TestCase):
         self.client.login(username='student', password='12345')
         payload = {'username': self.user.username,
                    'user_id': self.student.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
                    'course': 'demo/2020/0/CV2020/1'}
 
         if api_settings.JWT_AUDIENCE is not None:
@@ -623,7 +813,7 @@ class TestCallbackView(TestCase):
         self.client.login(username='student', password='12345')
         payload = {'username': self.user.username,
                    'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME),
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
                    'course': 'demo/2020/0/CV2020/1'}
 
         if api_settings.JWT_AUDIENCE is not None:

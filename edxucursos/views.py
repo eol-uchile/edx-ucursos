@@ -60,12 +60,14 @@ class EdxUCursosLoginRedirect(View):
             logger.error(id_error + ' - Ticket caducado: ' + ticket)
             return HttpResponseNotFound(
                 '(Error '+ id_error +') Ticket caducado, reintente nuevamente o '+ msg_error)
-
-        rut = str(user_data['pers_id'])
-        rut_dv = self.digito_verificador(rut)
-        while len(rut) < 9:
-            rut = "0" + rut
-        rut = rut + rut_dv
+        if 'id_externo' in user_data:
+            rut = user_data['id_externo']
+        else:
+            rut = str(user_data['pers_id'])
+            rut_dv = self.digito_verificador(rut)
+            while len(rut) < 9:
+                rut = "0" + rut
+            rut = rut + rut_dv
 
         u_course = self.get_edxucursos_mapping(user_data['grupo'])
         mapp_course = self.validate_data(rut, u_course)
@@ -160,7 +162,7 @@ class EdxUCursosLoginRedirect(View):
             Create payload with user data to create auth token
         """
         payload = {'username': user.username, 'user_id': user.id, 'exp': dt.utcnow(
-        ) + datetime.timedelta(seconds=settings.EDXCURSOS_EXP_TIME), 'course': course}
+        ) + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME), 'course': course}
 
         if api_settings.JWT_AUDIENCE is not None:
             payload['aud'] = api_settings.JWT_AUDIENCE
@@ -172,8 +174,15 @@ class EdxUCursosLoginRedirect(View):
             Verify if rut and course are correct
         """
         try:
-            if not EdxLoginStaff().validarRut(rut):
-                return False
+            if rut[0] == 'P':
+                if 5 > len(rut[1:]) or len(rut[1:]) > 20:
+                    return False
+            elif rut[0:2] == 'CG':
+                if len(rut) != 10:
+                    return False
+            else:
+                if not EdxLoginStaff().validarRut(rut):
+                    return False
         except Exception:
             return False
 
@@ -229,8 +238,8 @@ class EdxUCursosLoginRedirect(View):
         """
         Get the callback url
         """
-        if settings.EDXCURSOS_DOMAIN != "":
-            url = '{}{}'.format(settings.EDXCURSOS_DOMAIN, reverse('edxucursos-login:callback'))
+        if settings.EDXUCURSOS_DOMAIN != "":
+            url = '{}{}'.format(settings.EDXUCURSOS_DOMAIN, reverse('edxucursos-login:callback'))
         else:
             url = request.build_absolute_uri(reverse('edxucursos-login:callback'))
         return '{}?token={}'.format(url, token)

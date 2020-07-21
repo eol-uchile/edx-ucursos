@@ -10,7 +10,7 @@ Authentication backend for EOl from Ucursos
 
 If you want redirect to another domain edit *common.py* in *settings* and add domain url, for example "http://my.domain.com".
 
-    EDXCURSOS_DOMAIN = ""
+    EDXUCURSOS_DOMAIN = ""
 
 ## TESTS
 **Prepare tests:**
