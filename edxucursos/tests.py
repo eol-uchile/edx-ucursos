@@ -835,3 +835,7 @@ class TestCallbackView(TestCase):
             result._headers['location'],
             ('Location',
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
+    def test_calculate_dv(self):
+        view = EdxUCursosLoginRedirect()
+        self.assertEqual(view.digito_verificador("9233040"), "0")
+        self.assertEqual(view.digito_verificador("23449628"), "K")
