@@ -120,21 +120,19 @@ class EdxUCursosLoginRedirect(View):
             return True
         return False
 
-    def digito_verificador(self, run):
+    def digito_verificador(self, rut):
         """
             Return rut check digit
         """
-        rut = reversed(list(map(int, run)))
-        m = [2, 3, 4, 5, 6, 7]
+        revertido = list(map(int, reversed(str(rut))))
+        factors = cycle(list(range(2, 8)))
+        s = sum(d * f for d, f in zip(revertido, factors))
+        res = (-s) % 11
 
-        d = sum([n * m[i % 6] for i, n in enumerate(rut)])
-        d %= 11
-
-        if (d == 1):
-            d = 'K'
-        else:
-            d = 11 - d
-        return str(d)
+        if (str(res) == 10):
+            return 'K'
+        
+        return str(res)
 
     def get_edxucursos_mapping(self, data):
         """
@@ -176,14 +174,18 @@ class EdxUCursosLoginRedirect(View):
         try:
             if rut[0] == 'P':
                 if 5 > len(rut[1:]) or len(rut[1:]) > 20:
+                    logger.error("Rango de rut pasaporte debe ser mayor a 5 y menor a 20, {}".format(rut))
                     return False
             elif rut[0:2] == 'CG':
                 if len(rut) != 10:
+                    logger.error("Rango de rut CG debe ser 10, {}".format(rut))
                     return False
             else:
                 if not EdxLoginStaff().validarRut(rut):
+                    logger.error("Rut invalido en EdxLoginStaff().validarRut(rut): {}".format(rut))
                     return False
         except Exception:
+            logger.error("Rut invalido: {}".format(rut))
             return False
 
         try:
@@ -191,10 +193,12 @@ class EdxUCursosLoginRedirect(View):
                 ucurso_course=course)
             course_id = six.text_type(course.edx_course)
         except EdxUCursosMapping.DoesNotExist:
+            logger.error("No Existe EdxUCursosMapping, id: {}".format(course))
             return False
 
         # verify if exists course
         if not EdxLoginStaff().validate_course(course_id):
+            logger.error("Curso no existe, id: {}".format(course_id))
             return False
 
         return course
