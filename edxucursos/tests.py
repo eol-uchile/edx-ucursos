@@ -57,6 +57,52 @@ class TestRedirectView(ModuleStoreTestCase):
                 is_staff=True)
 
     @patch('requests.get')
+    def test_login_with_rut_dv_is_K(self, get):
+        """
+            Test EdxUCursosLoginRedirect normal procedure with rut_dv is K
+        """
+        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "text"])(
+                200,
+                json.dumps(
+                    {
+                        "pers_id": 19027537,
+                        "permisos": {
+                            "PROFESOR": 1,
+                            "VER": 1,
+                            "DEV": 1},
+                        "lang": "es",
+                        "theme": None,
+                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                        "time": time.time(),
+                        "mod_id": "eol",
+                        "gru_id": "curso.372168",
+                        "grupo": {
+                                "base": "demo",
+                                "anno": "2020",
+                                "semestre": "0",
+                                "codigo": "CV2020",
+                                "seccion": "1",
+                                "nombre": "Curso de prueba Virtual"}}))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertIn(
+            'http://testserver/edxucursos/callback?token=',
+            result._container[0].decode())
+
+    @patch('requests.get')
     def test_login(self, get):
         """
             Test EdxUCursosLoginRedirect normal procedure

@@ -129,7 +129,7 @@ class EdxUCursosLoginRedirect(View):
         s = sum(d * f for d, f in zip(revertido, factors))
         res = (-s) % 11
 
-        if (str(res) == 10):
+        if (str(res) == '10'):
             return 'K'
         
         return str(res)
