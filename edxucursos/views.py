@@ -19,9 +19,9 @@ from urllib.parse import urlencode
 from itertools import cycle
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys import InvalidKeyError
-from courseware.courses import get_course_by_id, get_course_with_access
-from courseware.access import has_access
-from util.json_request import JsonResponse, JsonResponseBadRequest
+from lms.djangoapps.courseware.courses import get_course_by_id, get_course_with_access
+from lms.djangoapps.courseware.access import has_access
+from common.djangoapps.util.json_request import JsonResponse, JsonResponseBadRequest
 from rest_framework_jwt.settings import api_settings
 from datetime import datetime as dt
 from rest_framework_jwt.utils import jwt_get_secret_key
