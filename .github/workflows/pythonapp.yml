@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Create coverage config file
       run: |
-        echo -e "[run] \nomit = eolzoom/migrations/*" > .coveragerc
+        echo -e "[run] \nomit = edxucursos/migrations/*" > .coveragerc
     - name: Run Tests
       run: |
         cd .github/
