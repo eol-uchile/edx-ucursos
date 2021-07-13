@@ -1,5 +1,7 @@
 # EDX UCursos
 
+![Coverage Status](https://github.com/eol-uchile/edx-ucursos/blob/master/coverage-badge.svg)
+
 Authentication backend for EOl from Ucursos
 
 # Install

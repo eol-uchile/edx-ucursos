@@ -9,7 +9,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - name: Create coverage config file
+      run: |
+        echo -e "[run] \nomit = eolzoom/migrations/*" > .coveragerc
     - name: Run Tests
-      run: |        
+      run: |
         cd .github/
         docker-compose run lms /openedx/requirements/edx-ucursos/.github/test.sh
+    - name: Push changes
+      run: |
+        ./.github/commit.sh ${{ secrets.GITHUB_TOKEN }}
