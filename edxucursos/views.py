@@ -235,6 +235,8 @@ class EdxUCursosLoginRedirect(View):
         """
         if "PROFESOR" in data and data["PROFESOR"] == 1:
             return "audit"
+        if "AYUDANTE" in data and data["AYUDANTE"] == 1:
+            return "audit"
         return "honor"
 
     @staticmethod
