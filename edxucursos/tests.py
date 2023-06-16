@@ -264,27 +264,14 @@ class TestRedirectView(ModuleStoreTestCase):
     @patch(
         "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
         side_effect=create_user)
-    @patch('requests.post')
     @patch('requests.get')
-    def test_login_create_user(self, get, post, mock_created_user):
+    def test_login_create_user(self, get, mock_created_user):
         """
             Testing when edxlogin_user no exists
         """
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
-        data = {"cuentascorp": [{"cuentaCorp": "avilio.perez@ug.uchile.cl",
-                                 "tipoCuenta": "EMAIL",
-                                 "organismoDominio": "ug.uchile.cl"},
-                                {"cuentaCorp": "avilio.perez@uchile.cl",
-                                 "tipoCuenta": "EMAIL",
-                                 "organismoDominio": "uchile.cl"},
-                                {"cuentaCorp": "avilio.perez@u.uchile.cl",
-                                 "tipoCuenta": "EMAIL",
-                                 "organismoDominio": "u.uchile.cl"},
-                                {"cuentaCorp": "avilio.perez",
-                                 "tipoCuenta": "CUENTA PASAPORTE",
-                                 "organismoDominio": "Universidad de Chile"}]}
 
         get.side_effect = [namedtuple(
             "Request",
@@ -315,22 +302,14 @@ class TestRedirectView(ModuleStoreTestCase):
             namedtuple("Request",
                        ["status_code",
                         "text"])(200,
-                                 json.dumps({"apellidoPaterno": "TESTLASTNAME",
-                                             "apellidoMaterno": "TESTLASTNAME",
-                                             "nombres": "TEST NAME",
-                                             "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
-                                             "rut": "0000000108"}))]
-        post.side_effect = [namedtuple("Request",
-                                       ["status_code",
-                                        "text"])(200,
-                                                 json.dumps(data)),
-                            namedtuple("Request",
-                                       ["status_code",
-                                        "text"])(200,
-                                                 json.dumps({"emails": [{"rut": "0000000108",
-                                                                         "email": "test@test.test",
-                                                                         "codigoTipoEmail": "1",
-                                                                         "nombreTipoEmail": "PRINCIPAL"}]}))]
+                                 json.dumps({'data':{'getRowsPersona':{'status_code':200,'persona':[
+                                            {"paterno": "TESTLASTNAME",
+                                            "materno": "TESTLASTNAME",
+                                            'pasaporte': [{'usuario':'avilio.perez'}],
+                                            "nombres": "TEST NAME",
+                                            'email': [{'email': 'student22@edx2.org'},{'email': 'student33@edx.org'},{'email': 'student44@edx.org'}],
+                                            "indiv_id": "0000000108"}]}}}))]
+
         result = self.client.get(
             reverse('edxucursos-login:login'),
             data={
@@ -344,9 +323,9 @@ class TestRedirectView(ModuleStoreTestCase):
                 'apellidoMaterno': 'TESTLASTNAME',
                 'nombres': 'TEST NAME',
                 'apellidoPaterno': 'TESTLASTNAME',
-                'nombreCompleto': 'TEST NAME TESTLASTNAME TESTLASTNAME',
                 'rut': '0000000108',
-                'email': 'test@test.test'})
+                'emails': ['student22@edx2.org','student33@edx.org', 'student44@edx.org'],
+                'email': 'student22@edx2.org'})
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
             result._container[0].decode())
@@ -354,28 +333,14 @@ class TestRedirectView(ModuleStoreTestCase):
     @patch(
         "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
         side_effect=create_user)
-    @patch('requests.post')
     @patch('requests.get')
-    def test_login_fail_create_user(self, get, post, mock_created_user):
+    def test_login_fail_create_user(self, get, mock_created_user):
         """
             Testing when fail in create user
         """
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
-        data = {"cuentascorp": [{"cuentaCorp": "avilio.perez@ug.uchile.cl",
-                                 "tipoCuenta": "EMAIL",
-                                 "organismoDominio": "ug.uchile.cl"},
-                                {"cuentaCorp": "avilio.perez@uchile.cl",
-                                 "tipoCuenta": "EMAIL",
-                                 "organismoDominio": "uchile.cl"},
-                                {"cuentaCorp": "avilio.perez@u.uchile.cl",
-                                 "tipoCuenta": "EMAIL",
-                                 "organismoDominio": "u.uchile.cl"},
-                                {"cuentaCorp": "avilio.perez",
-                                 "tipoCuenta": "CUENTA PASAPORTE",
-                                 "organismoDominio": "Universidad de Chile"}]}
-
         get.side_effect = [namedtuple(
             "Request",
             [
@@ -405,22 +370,7 @@ class TestRedirectView(ModuleStoreTestCase):
             namedtuple("Request",
                        ["status_code",
                         "text"])(404,
-                                 json.dumps({"apellidoPaterno": "TESTLASTNAME",
-                                             "apellidoMaterno": "TESTLASTNAME",
-                                             "nombres": "TEST NAME",
-                                             "nombreCompleto": "TEST NAME TESTLASTNAME TESTLASTNAME",
-                                             "rut": "0000000108"}))]
-        post.side_effect = [namedtuple("Request",
-                                       ["status_code",
-                                        "text"])(200,
-                                                 json.dumps(data)),
-                            namedtuple("Request",
-                                       ["status_code",
-                                        "text"])(200,
-                                                 json.dumps({"emails": [{"rut": "0000000108",
-                                                                         "email": "test@test.test",
-                                                                         "codigoTipoEmail": "1",
-                                                                         "nombreTipoEmail": "PRINCIPAL"}]}))]
+                                 json.dumps({}))]
         result = self.client.get(
             reverse('edxucursos-login:login'),
             data={
