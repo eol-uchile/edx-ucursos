@@ -18,5 +18,5 @@ cd /openedx/requirements/app
 
 DJANGO_SETTINGS_MODULE=lms.envs.test EDXAPP_TEST_MONGO_HOST=mongodb pytest edxucursos/tests.py
 
-echo -e "[run]\nomit = edxucursos/migrations/*" > .coveragerc
+echo "[run]\nomit = edxucursos/migrations/*" > .coveragerc
 genbadge coverage
