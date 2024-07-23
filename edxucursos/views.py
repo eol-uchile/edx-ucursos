@@ -99,11 +99,15 @@ class EdxUCursosLoginRedirect(View):
         parameters = {
             'ticket': ticket
         }
-        result = requests.get(
-            settings.EDXUCURSOS_VERIFY_TICKET,
-            params=urlencode(parameters),
-            headers={
-                'content-type': 'application/json'})
+        try:
+            result = requests.get(
+                settings.EDXUCURSOS_VERIFY_TICKET,
+                params=urlencode(parameters),
+                headers={
+                    'content-type': 'application/json'})
+            result.raise_for_status()
+        except requests.exceptions.HTTPError:
+            return {'result': 'error'}
         logger.info(result.text)
         if result.text != 'null':
             data = json.loads(result.text)

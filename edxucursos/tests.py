@@ -30,6 +30,7 @@ import json
 import urllib.parse
 import time
 import uuid
+from requests.exceptions import HTTPError
 
 
 def create_user(user_data, have_pass):
@@ -70,8 +71,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 19027537,
@@ -116,8 +119,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -149,6 +154,31 @@ class TestRedirectView(ModuleStoreTestCase):
             result._container[0].decode())
 
     @patch('requests.get')
+    def test_login_server_error(self, get):
+        """
+            Testing when U-cursos ticket api is responding wrong
+        """
+        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        get.side_effect = [
+            namedtuple(
+                "Request",
+                [
+                    "status_code",
+                    "raise_for_status"])(
+                404,
+                Mock(side_effect=HTTPError('not found')))]
+
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+        self.assertEqual(result.status_code, 404)
+        self.assertTrue(
+            'Error con la api de ucursos (ticket)' in
+            result._container[0].decode())
+
+
+    @patch('requests.get')
     def test_login_wrong_or_none_ticket(self, get):
         """
             Testing when ticket is wrong or none
@@ -159,8 +189,11 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
-                200, 'null')]
+                200,
+                Mock(),
+                'null')]
 
         result = self.client.get(
             reverse('edxucursos-login:login'),
@@ -182,8 +215,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -228,8 +263,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -277,8 +314,10 @@ class TestRedirectView(ModuleStoreTestCase):
             "Request",
             [
                 "status_code",
+                "raise_for_status",
                 "text"])(
             200,
+            Mock(),
             json.dumps(
                 {
                     "pers_id": 10,
@@ -345,8 +384,10 @@ class TestRedirectView(ModuleStoreTestCase):
             "Request",
             [
                 "status_code",
+                "raise_for_status",
                 "text"])(
             200,
+            Mock(),
             json.dumps(
                 {
                     "pers_id": 10,
@@ -396,8 +437,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -442,8 +485,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -489,8 +534,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -537,8 +584,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
@@ -584,8 +633,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 "Request",
                 [
                     "status_code",
+                    "raise_for_status",
                     "text"])(
                 200,
+                Mock(),
                 json.dumps(
                     {
                         "pers_id": 10,
