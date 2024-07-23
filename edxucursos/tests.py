@@ -32,7 +32,7 @@ import time
 import uuid
 
 
-def create_user(user_data):
+def create_user(user_data, have_pass):
     return User.objects.create_user(
         username=EdxLoginStaff().generate_username(user_data),
         email=user_data['email'])
@@ -301,14 +301,14 @@ class TestRedirectView(ModuleStoreTestCase):
                         "nombre": "Curso de prueba Virtual"}})),
             namedtuple("Request",
                        ["status_code",
-                        "text"])(200,
-                                 json.dumps({'data':{'getRowsPersona':{'status_code':200,'persona':[
+                        "json"])(200,
+                                 lambda:{'data':{'getRowsPersona':{'status_code':200,'persona':[
                                             {"paterno": "TESTLASTNAME",
                                             "materno": "TESTLASTNAME",
                                             'pasaporte': [{'usuario':'avilio.perez'}],
                                             "nombres": "TEST NAME",
                                             'email': [{'email': 'student22@edx2.org'},{'email': 'student33@edx.org'},{'email': 'student44@edx.org'}],
-                                            "indiv_id": "0000000108"}]}}}))]
+                                            "indiv_id": "0000000108"}]}}})]
 
         result = self.client.get(
             reverse('edxucursos-login:login'),
