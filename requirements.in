@@ -1,0 +1,17 @@
+autopep8
+certifi
+chardet
+Django
+edx-opaque-keys
+funcsigs
+idna
+mock
+pbr
+pycodestyle
+pymongo
+pytz
+requests
+six
+stevedore
+Unidecode
+urllib3
