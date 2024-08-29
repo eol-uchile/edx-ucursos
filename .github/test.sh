@@ -2,8 +2,8 @@
 
 set -e
 
-pip install -e git+https://github.com/eol-uchile/uchileedxlogin@0.0.1#egg=uchileedxlogin
-pip install -e /openedx/requirements/app
+pip install --src /openedx/venv/src -e git+https://github.com/eol-uchile/uchileedxlogin@0.0.1#egg=uchileedxlogin
+pip install --src /openedx/venv/src -e /openedx/requirements/app
 pip install pytest-cov genbadge[coverage]
 
 cd /openedx/requirements/app
