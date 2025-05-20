@@ -148,16 +148,6 @@ class EdxUCursosLoginRedirect(View):
                                        data['codigo'],
                                        data['seccion'])
 
-    def login_user(self, request, edxlogin_user):
-        """
-            Login user
-        """
-        login(
-            request,
-            edxlogin_user.user,
-            backend="django.contrib.auth.backends.AllowAllUsersModelBackend",
-        )
-        return token
 
     def get_payload(self, user, course):
         """
