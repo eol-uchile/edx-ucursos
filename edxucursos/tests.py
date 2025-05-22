@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from mock import patch, Mock
-from .models import EdxUCursosMapping
-from collections import namedtuple
-from common.djangoapps.student.tests.factories import UserFactory
+# Python Standard Libraries
 from datetime import datetime as dt
+from collections import namedtuple
+import datetime
+import json
+import time
+import uuid
+
+# Installed packages (via pip)
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 from django.urls import reverse
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from mock import patch, Mock
 from requests.exceptions import HTTPError
 from rest_framework_jwt.settings import api_settings
 from uchileedxlogin.models import EdxLoginUser
@@ -21,14 +25,10 @@ from common.djangoapps.student.tests.factories import UserFactory
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from xmodule.modulestore.tests.factories import CourseFactory
-import datetime
-import json
-import time
-import time
-import uuid
 
+# Internal project dependencies
+from .models import EdxUCursosMapping
 from .views import EdxUCursosLoginRedirect
-
 
 def create_user(user_data, have_pass):
     return User.objects.create_user(

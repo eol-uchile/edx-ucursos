@@ -1,41 +1,33 @@
 #!/usr/bin/env python
 # -- coding: utf-8 --
-
-from django.conf import settings
-from django.core.exceptions import ValidationError
-from django.contrib.auth import login, logout
-from django.contrib.auth.models import User
-from django.contrib.sites.shortcuts import get_current_site
-from django.db import transaction
-from django.http import HttpResponseRedirect, HttpResponseForbidden, Http404, HttpResponseNotFound
-from django.shortcuts import render
-from django.urls import reverse
-from django.views.generic.base import View
-from django.http import HttpResponse
-from uchileedxlogin.models import EdxLoginUser, EdxLoginUserCourseRegistration
-from uchileedxlogin.views import EdxLoginStaff
-from .models import EdxUCursosMapping
-from urllib.parse import urlencode
-from itertools import cycle
-from opaque_keys.edx.keys import CourseKey
-from opaque_keys import InvalidKeyError
-from lms.djangoapps.courseware.courses import get_course_by_id, get_course_with_access
-from lms.djangoapps.courseware.access import has_access
-from common.djangoapps.util.json_request import JsonResponse, JsonResponseBadRequest
-from rest_framework_jwt.settings import api_settings
+# Python Standard Libraries
 from datetime import datetime as dt
-from rest_framework_jwt.utils import jwt_get_secret_key
+from itertools import cycle
+from urllib.parse import urlencode
 import datetime
 import json
-import requests
-import uuid
-import unidecode
 import logging
-import sys
-import unicodecsv as csv
 import time
+import uuid
+
+# Installed packages (via pip)
+from django.conf import settings
+from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
+from django.db import transaction
+from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound
+from django.urls import reverse
+from django.views.generic.base import View
+from rest_framework_jwt.settings import api_settings
+from rest_framework_jwt.utils import jwt_get_secret_key
+from uchileedxlogin.models import EdxLoginUser
+from uchileedxlogin.views import EdxLoginStaff
 import jwt
+import requests
 import six
+
+# Internal project dependencies
+from .models import EdxUCursosMapping
 
 logger = logging.getLogger(__name__)
 msg_error = "contáctese al correo eol-ayuda@uchile.cl adjuntando el número del error"
