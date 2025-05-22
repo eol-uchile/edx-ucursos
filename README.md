@@ -1,6 +1,6 @@
 # EDX UCursos
 
-![Coverage Status](https://github.com/eol-uchile/edx-ucursos/blob/master/coverage-badge.svg)
+![Coverage Status](/coverage-badge.svg)
 
 Authentication backend for EOl from Ucursos
 
@@ -17,5 +17,10 @@ If you want redirect to another domain edit *common.py* in *settings* and add do
 ## TESTS
 **Prepare tests:**
 
-    > cd .github/
-    > docker-compose run lms /openedx/requirements/edx-ucursos/.github/test.sh
+- Install **act** following the instructions in [https://nektosact.com/installation/index.html](https://nektosact.com/installation/index.html)
+
+**Run tests:**
+- In a terminal at the root of the project
+    ```
+    act -W .github/workflows/pythonapp.yml
+    ```
