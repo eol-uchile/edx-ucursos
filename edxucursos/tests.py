@@ -1,37 +1,34 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from mock import patch, Mock, MagicMock
-from collections import namedtuple
-from django.urls import reverse
-from django.test import TestCase, Client
-from django.test import Client
-from django.conf import settings
-from django.contrib.auth.models import Permission, User
-from django.contrib.contenttypes.models import ContentType
-from urllib.parse import parse_qs
-from opaque_keys.edx.locator import CourseLocator
-from common.djangoapps.student.tests.factories import CourseEnrollmentAllowedFactory, UserFactory, CourseEnrollmentFactory
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
-from .views import EdxUCursosLoginRedirect, EdxUCursosCallback
-from .models import EdxUCursosMapping
-from uchileedxlogin.models import EdxLoginUser
-from uchileedxlogin.views import EdxLoginStaff
-from rest_framework_jwt.settings import api_settings
+# Python Standard Libraries
 from datetime import datetime as dt
-from django.test.utils import override_settings
+from collections import namedtuple
 import datetime
-import time
-import re
 import json
-import urllib.parse
 import time
 import uuid
-from requests.exceptions import HTTPError
 
+# Installed packages (via pip)
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.test import TestCase, Client
+from django.test.utils import override_settings
+from django.urls import reverse
+from mock import patch, Mock
+from requests.exceptions import HTTPError
+from rest_framework_jwt.settings import api_settings
+from uchileedxlogin.models import EdxLoginUser
+from uchileedxlogin.views import EdxLoginStaff
+
+# Edx dependencies
+from common.djangoapps.student.tests.factories import UserFactory
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
+
+# Internal project dependencies
+from .models import EdxUCursosMapping
+from .views import EdxUCursosLoginRedirect
 
 def create_user(user_data, have_pass):
     return User.objects.create_user(
@@ -668,6 +665,63 @@ class TestRedirectView(ModuleStoreTestCase):
         self.assertTrue(
             'Error con los parametros' in
             result._container[0].decode())
+        
+    def test_validate_data_invalid_rut(self):
+        """
+        This test checks that the validate_data method correctly identifies an invalid format RUT and logs a warning. 
+        It ensures the method enforces RUT validation rules and prevents further processing when the input is invalid.
+        """
+        with self.assertLogs('edxucursos.views', level='INFO') as cm:
+            result = EdxUCursosLoginRedirect.validate_data(self, '111111', '123456789')
+        self.assertFalse(result)
+        self.assertTrue(any(
+        'Rut invalido en EdxLoginStaff().validarRut(rut): 111111' in log
+        for log in cm.output))
+
+    def test_validate_data_none_as_rut(self):
+        """
+        This test checks that the validate_data method correctly identifies an invalid RUT in this case as a number instead of a string, and logs a warning.
+        It ensures the method enforces RUT validation rules and prevents further processing when the input is invalid.
+        """
+        with self.assertLogs('edxucursos.views', level='INFO') as cm:
+            result = EdxUCursosLoginRedirect.validate_data(self, 1111111, '123456789')
+        self.assertFalse(result)
+        self.assertTrue(any(
+        'Rut invalido: 111111' in log
+        for log in cm.output))
+    
+    def test_validate_data_course_invalid_data(self):
+        """
+        This test checks that the validate_data method correctly identifies an invalid course and logs a warning.
+        """
+        with self.assertLogs('edxucursos.views', level='INFO') as cm:
+            result = EdxUCursosLoginRedirect.validate_data(self, '11111111-1', '123456789')
+        self.assertFalse(result)
+        self.assertTrue(any(
+        'No Existe EdxUCursosMapping, id: 123456789' in log
+        for log in cm.output))
+
+    def test_get_mode_ayudante(self):
+        """
+        This test checks that when the input data includes "AYUDANTE": 1, the get_mode method returns "audit".
+        """
+        data = {
+            "PROFESOR": 0,
+            "AYUDANTE": 1
+        }
+        result = EdxUCursosLoginRedirect.get_mode(self, data)
+        self.assertEqual(result, "audit")
+    
+    def test_get_mode_not_ayudante_or_profesor(self):
+        """
+        This test verifies that if the input data does not include "PROFESOR": 1 or "AYUDANTE": 1, the method returns "honor".
+        """
+        data = {
+            "PROFESOR": 0,
+            "AYUDANTE": 0
+        }
+        result = EdxUCursosLoginRedirect.get_mode(self, data)
+        self.assertEqual(result, "honor")
 
 class TestCallbackView(TestCase):
     def setUp(self):
@@ -882,3 +936,33 @@ class TestCallbackView(TestCase):
             result._headers['location'],
             ('Location',
              '/courses/course-v1:mss+MSS001+2019_2/course/'))
+    
+    def test_callback_different_wrong_user_id(self):
+        """
+           Tests the behavior when a non-existent user_id is provided by verifying that the expected 
+           log message is generated, indicating login error.
+        """
+        self.client.login(username='student', password='12345')
+        payload = {'username': self.user.username,
+                   'user_id': '11111111',
+                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
+                   'course': 'demo/2020/0/CV2020/1'}
+
+        if api_settings.JWT_AUDIENCE is not None:
+            payload['aud'] = api_settings.JWT_AUDIENCE
+
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        token = jwt_encode_handler(payload)
+
+        EdxUCursosMapping.objects.create(
+            edx_course='course-v1:mss+MSS001+2019_2',
+            ucurso_course='demo/2020/0/CV2020/1')
+        result = self.client.get(
+            reverse('edxucursos-login:callback'),
+            data={
+                'token': token})
+        
+        self.assertEqual(result.status_code, 404)
+        self.assertTrue(
+            'Logging Error, reintente nuevamente' in
+            result._container[0].decode())
