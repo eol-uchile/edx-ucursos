@@ -17,8 +17,8 @@ from django.urls import reverse
 from mock import patch, Mock
 from requests.exceptions import HTTPError
 from rest_framework_jwt.settings import api_settings
-from uchileedxlogin.models import EdxLoginUser
-from uchileedxlogin.views import EdxLoginStaff
+from uchileedxlogin.services.test_utils import create_edxloginuser
+from uchileedxlogin.services.utils import generate_username
 
 # Edx dependencies
 from common.djangoapps.student.tests.factories import UserFactory
@@ -32,7 +32,7 @@ from .views import EdxUCursosLoginRedirect
 
 def create_user(user_data, have_pass):
     return User.objects.create_user(
-        username=EdxLoginStaff().generate_username(user_data),
+        username=generate_username(user_data),
         email=user_data['email'])
 
 
@@ -59,7 +59,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect normal procedure with rut_dv is K
         """
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
+        create_edxloginuser(self.user, '019027537K')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -107,7 +107,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect normal procedure
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -155,7 +155,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when U-cursos ticket api is responding wrong
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -180,7 +180,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when ticket is wrong or none
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -206,7 +206,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when ticket is expired
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -251,7 +251,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when course no exists
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         EdxUCursosMapping.objects.create(
             edx_course='course-v1:mss+MSS001+2019_2',
             ucurso_course='demo/2020/0/CV2020/1')
@@ -296,7 +296,7 @@ class TestRedirectView(ModuleStoreTestCase):
             result._container[0].decode())
 
     @patch(
-        "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
+        "uchileedxlogin.services.interface.create_user_by_data",
         side_effect=create_user)
     @patch('requests.get')
     def test_login_create_user(self, get, mock_created_user):
@@ -359,7 +359,7 @@ class TestRedirectView(ModuleStoreTestCase):
                 'apellidoMaterno': 'TESTLASTNAME',
                 'nombres': 'TEST NAME',
                 'apellidoPaterno': 'TESTLASTNAME',
-                'rut': '0000000108',
+                'doc_id': '0000000108',
                 'emails': ['student22@edx2.org','student33@edx.org', 'student44@edx.org'],
                 'email': 'student22@edx2.org'})
         self.assertIn(
@@ -367,7 +367,7 @@ class TestRedirectView(ModuleStoreTestCase):
             result._container[0].decode())
 
     @patch(
-        "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
+        "uchileedxlogin.services.interface.create_user_by_data",
         side_effect=create_user)
     @patch('requests.get')
     def test_login_fail_create_user(self, get, mock_created_user):
@@ -425,7 +425,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect normal procedure with domain settings
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -473,7 +473,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect with passport
         """
-        EdxLoginUser.objects.create(user=self.user, run='PABC112233')
+        create_edxloginuser(self.user, 'PABC112233')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -522,7 +522,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect with wrong passport
         """
-        EdxLoginUser.objects.create(user=self.user, run='PABC1122')
+        create_edxloginuser(self.user, 'PABC1122')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -572,7 +572,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect with CG account
         """
-        EdxLoginUser.objects.create(user=self.user, run='CG00112233')
+        create_edxloginuser(self.user, 'CG00112233')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -621,7 +621,7 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Test EdxUCursosLoginRedirect with wrong CG account
         """
-        EdxLoginUser.objects.create(user=self.user, run='CG00112233')
+        create_edxloginuser(self.user, 'CG00112233')
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -671,24 +671,16 @@ class TestRedirectView(ModuleStoreTestCase):
         This test checks that the validate_data method correctly identifies an invalid format RUT and logs a warning. 
         It ensures the method enforces RUT validation rules and prevents further processing when the input is invalid.
         """
-        with self.assertLogs('edxucursos.views', level='INFO') as cm:
-            result = EdxUCursosLoginRedirect.validate_data(self, '111111', '123456789')
+        result = EdxUCursosLoginRedirect.validate_data(self, '111111', '123456789')
         self.assertFalse(result)
-        self.assertTrue(any(
-        'Rut invalido en EdxLoginStaff().validarRut(rut): 111111' in log
-        for log in cm.output))
 
     def test_validate_data_none_as_rut(self):
         """
         This test checks that the validate_data method correctly identifies an invalid RUT in this case as a number instead of a string, and logs a warning.
         It ensures the method enforces RUT validation rules and prevents further processing when the input is invalid.
         """
-        with self.assertLogs('edxucursos.views', level='INFO') as cm:
-            result = EdxUCursosLoginRedirect.validate_data(self, 1111111, '123456789')
+        result = EdxUCursosLoginRedirect.validate_data(self, 1111111, '123456789')
         self.assertFalse(result)
-        self.assertTrue(any(
-        'Rut invalido: 111111' in log
-        for log in cm.output))
     
     def test_validate_data_course_invalid_data(self):
         """
@@ -751,7 +743,7 @@ class TestCallbackView(TestCase):
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
 
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        create_edxloginuser(self.user, '0000000108')
         EdxUCursosMapping.objects.create(
             edx_course='course-v1:mss+MSS001+2019_2',
             ucurso_course='demo/2020/0/CV2020/1')

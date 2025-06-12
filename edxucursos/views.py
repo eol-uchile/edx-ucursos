@@ -14,14 +14,13 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
-from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound
 from django.urls import reverse
 from django.views.generic.base import View
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.utils import jwt_get_secret_key
-from uchileedxlogin.models import EdxLoginUser
-from uchileedxlogin.views import EdxLoginStaff
+from uchileedxlogin.services.utils import validate_course, validate_all_doc_id_types
+from uchileedxlogin.services.interface import enroll_user
 import jwt
 import requests
 import six
@@ -60,7 +59,6 @@ class EdxUCursosLoginRedirect(View):
             while len(rut) < 9:
                 rut = "0" + rut
             rut = rut + rut_dv
-
         u_course = self.get_edxucursos_mapping(user_data['grupo'])
         mapp_course = self.validate_data(rut, u_course)
         if not mapp_course:
@@ -68,10 +66,8 @@ class EdxUCursosLoginRedirect(View):
             logger.error(id_error + '- Error con los parametros: rut de usuario o id del curso')
             return HttpResponseNotFound(
                 '(Error '+ id_error +') Error con los parametros: rut de usuario o id del curso, por favor '+ msg_error)
-
         mode = self.get_mode(user_data["permisos"])
-        edxlogin_user = self.enroll_or_create_user(rut, mapp_course, mode)
-
+        edxlogin_user = enroll_user(rut, str(mapp_course.edx_course), mode)
         if edxlogin_user:
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
             payload = self.get_payload(edxlogin_user.user, u_course)
@@ -157,23 +153,10 @@ class EdxUCursosLoginRedirect(View):
         """
             Verify if rut and course are correct
         """
-        try:
-            if rut[0] == 'P':
-                if 5 > len(rut[1:]) or len(rut[1:]) > 20:
-                    logger.error("Rango de rut pasaporte debe ser mayor a 5 y menor a 20, {}".format(rut))
-                    return False
-            elif rut[0:2] == 'CG':
-                if len(rut) != 10:
-                    logger.error("Rango de rut CG debe ser 10, {}".format(rut))
-                    return False
-            else:
-                if not EdxLoginStaff().validarRut(rut):
-                    logger.error("Rut invalido en EdxLoginStaff().validarRut(rut): {}".format(rut))
-                    return False
-        except Exception:
-            logger.error("Rut invalido: {}".format(rut))
+        # Checks if the doc_id is valid.
+        if not validate_all_doc_id_types(rut):
             return False
-
+        # Checks if there is a mapping between course and a ucursos course.
         try:
             course = EdxUCursosMapping.objects.get(
                 ucurso_course=course)
@@ -181,37 +164,11 @@ class EdxUCursosLoginRedirect(View):
         except EdxUCursosMapping.DoesNotExist:
             logger.error("No Existe EdxUCursosMapping, id: {}".format(course))
             return False
-
-        # verify if exists course
-        if not EdxLoginStaff().validate_course(course_id):
+        # Checks if the course exists.
+        if not validate_course(course_id):
             logger.error("Curso no existe, id: {}".format(course_id))
             return False
-
         return course
-
-    def enroll_or_create_user(self, run, course, mode):
-        """
-            Get o create edxlogin_user and enroll to course
-        """
-        with transaction.atomic():
-            try:
-                edxlogin_user = EdxLoginUser.objects.get(run=run)
-                EdxLoginStaff().enroll_course(
-                    edxlogin_user, six.text_type(
-                        course.edx_course), True, mode)
-                logger.info(
-                    'Exists EdxLogin_User: ' +
-                    edxlogin_user.user.username)
-                return edxlogin_user
-            except EdxLoginUser.DoesNotExist:
-                logger.info('Force Create User')
-                edxlogin_user = EdxLoginStaff().force_create_user(run)
-                if edxlogin_user:
-                    EdxLoginStaff().enroll_course(
-                        edxlogin_user, six.text_type(
-                            course.edx_course), True, mode)
-                    return edxlogin_user
-        return None
 
     def get_mode(self, data):
         """
