@@ -30,10 +30,10 @@ from xmodule.modulestore.tests.factories import CourseFactory
 from .models import EdxUCursosMapping
 from .views import EdxUCursosLoginRedirect
 
-def create_user(user_data, have_pass):
+def create_user(user_data, email, have_pass):
     return User.objects.create_user(
         username=generate_username(user_data),
-        email=user_data['email'])
+        email=email)
 
 
 class TestRedirectView(ModuleStoreTestCase):
@@ -360,8 +360,7 @@ class TestRedirectView(ModuleStoreTestCase):
                 'nombres': 'TEST NAME',
                 'apellidoPaterno': 'TESTLASTNAME',
                 'doc_id': '0000000108',
-                'emails': ['student22@edx2.org','student33@edx.org', 'student44@edx.org'],
-                'email': 'student22@edx2.org'})
+                'emails': ['student22@edx2.org','student33@edx.org', 'student44@edx.org']})
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
             result._container[0].decode())
