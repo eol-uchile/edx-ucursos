@@ -19,11 +19,15 @@ from django.urls import reverse
 from django.views.generic.base import View
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.utils import jwt_get_secret_key
-from uchileedxlogin.services.interface import enroll_user
+from uchileedxlogin.services.interface import edxloginuser_factory, get_user_by_doc_id
 from uchileedxlogin.services.utils import validate_course, validate_all_doc_id_types
 import jwt
 import requests
 import six
+
+# Edx dependencies
+from common.djangoapps.student.models import CourseEnrollment
+from opaque_keys.edx.keys import CourseKey
 
 # Internal project dependencies
 from .models import EdxUCursosMapping
@@ -69,13 +73,18 @@ class EdxUCursosLoginRedirect(View):
             return HttpResponseNotFound(
                 '(Error '+ id_error +') Error con los parametros: doc_id de usuario o id del curso, por favor '+ MSG_ERROR)
         mode = self.get_mode(user_data["permisos"])
-        edxlogin_user = enroll_user(doc_id, str(mapp_course.edx_course), mode)
+        edxlogin_user = get_user_by_doc_id(doc_id)
+        if not edxlogin_user:
+            edxlogin_user = edxloginuser_factory(doc_id, "doc_id")
         if edxlogin_user:
+            # Enroll the user.
+            CourseEnrollment.enroll(edxlogin_user.user, CourseKey.from_string(str(mapp_course.edx_course)), mode=mode)
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
             payload = self.get_payload(edxlogin_user.user, u_course)
             token = jwt_encode_handler(payload)
             return HttpResponse(
                 EdxUCursosLoginRedirect.get_callback_url(request, token))
+        # TODO: revisar flujo de errores.
         else:
             id_error = str(uuid.uuid4())
             logger.error(id_error + ' - Error creating user')
