@@ -43,21 +43,20 @@ class EdxUCursosLoginRedirect(View):
     Return a url with user token to log in.
     """
     def get(self, request):
+        error_id = str(uuid.uuid4())
         ticket = request.GET.get('ticket', "")
         logger.info('ticket: ' + ticket)
         user_data = self.get_data_ticket(ticket)
         if user_data['result'] == 'error':
-            id_error = str(uuid.uuid4())
-            logger.error(id_error + '- Data error')
+            logger.error(error_id + '- Data error')
             logger.info(user_data)
             return HttpResponseNotFound(
-                '(Error '+ id_error +') Error con la api de ucursos (ticket), por favor '+ MSG_ERROR)
+                '(Error '+ error_id +') Error con la api de ucursos (ticket), por favor '+ MSG_ERROR)
 
         if self.verify_caducity(user_data):
-            id_error = str(uuid.uuid4())
-            logger.error(id_error + ' - Ticket caducado: ' + ticket)
+            logger.error(error_id + ' - Ticket caducado: ' + ticket)
             return HttpResponseNotFound(
-                '(Error '+ id_error +') Ticket caducado, reintente nuevamente o '+ MSG_ERROR)
+                '(Error '+ error_id +') Ticket caducado, reintente nuevamente o '+ MSG_ERROR)
         if 'id_externo' in user_data:
             doc_id = user_data['id_externo']
         # If the user doesn't have an id_externo it is assumed that its pers_id is a rut without the verification digit.
@@ -71,10 +70,9 @@ class EdxUCursosLoginRedirect(View):
         u_course = self.get_edxucursos_mapping(user_data['grupo'])
         mapp_course = self.validate_data(doc_id, u_course)
         if not mapp_course:
-            id_error = str(uuid.uuid4())
-            logger.error(id_error + '- Error con los parametros: doc_id de usuario o id del curso')
+            logger.error(error_id + '- Error con los parametros: doc_id de usuario o id del curso')
             return HttpResponseNotFound(
-                '(Error '+ id_error +') Error con los parametros: doc_id de usuario o id del curso, por favor '+ MSG_ERROR)
+                '(Error '+ error_id +') Error con los parametros: doc_id de usuario o id del curso, por favor '+ MSG_ERROR)
         mode = self.get_mode(user_data["permisos"])
         edxlogin_user = get_user_by_doc_id(doc_id)
         if not edxlogin_user:
@@ -88,10 +86,9 @@ class EdxUCursosLoginRedirect(View):
             return HttpResponse(
                 EdxUCursosLoginRedirect.get_callback_url(request, token))
         else:
-            id_error = str(uuid.uuid4())
-            logger.error(id_error + ' - Error creating user')
+            logger.error(error_id + ' - Error creating user')
             return HttpResponseNotFound(
-                '(Error '+ id_error +') Error con los datos del usuario, por favor '+ MSG_ERROR)
+                '(Error '+ error_id +') Error con los datos del usuario, por favor '+ MSG_ERROR)
 
     def get_data_ticket(self, ticket):
         """
