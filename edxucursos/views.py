@@ -19,8 +19,7 @@ from django.urls import reverse
 from django.views.generic.base import View
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.utils import jwt_get_secret_key
-from uchileedxlogin.services.interface import edxloginuser_factory, get_user_by_doc_id
-from uchileedxlogin.services.utils import validate_all_doc_id_types
+from uchileedxlogin.services.interface import edxloginuser_factory, EmailException, get_user_by_doc_id, PhApiException
 import jwt
 import requests
 import six
@@ -68,27 +67,39 @@ class EdxUCursosLoginRedirect(View):
                 doc_id = "0" + doc_id
             doc_id = doc_id + ver_digit
         u_course = self.get_edxucursos_mapping(user_data['grupo'])
-        mapp_course = self.validate_data(doc_id, u_course)
+        mapp_course = self.validate_data(u_course)
         if not mapp_course:
-            logger.error(error_id + '- Error con los parametros: doc_id de usuario o id del curso')
+            logger.error(error_id + '- Error con el parametro: id del curso')
             return HttpResponseNotFound(
-                '(Error '+ error_id +') Error con los parametros: doc_id de usuario o id del curso, por favor '+ MSG_ERROR)
+                '(Error '+ error_id +') Error con el parametro: id del curso, por favor '+ MSG_ERROR)
         mode = self.get_mode(user_data["permisos"])
         edxlogin_user = get_user_by_doc_id(doc_id)
         if not edxlogin_user:
-            edxlogin_user = edxloginuser_factory(doc_id, "doc_id")
-        if edxlogin_user:
-            # Enroll the user.
-            CourseEnrollment.enroll(edxlogin_user.user, CourseKey.from_string(str(mapp_course.edx_course)), mode=mode)
-            jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-            payload = self.get_payload(edxlogin_user.user, u_course)
-            token = jwt_encode_handler(payload)
-            return HttpResponse(
-                EdxUCursosLoginRedirect.get_callback_url(request, token))
-        else:
-            logger.error(error_id + ' - Error creating user')
-            return HttpResponseNotFound(
-                '(Error '+ error_id +') Error con los datos del usuario, por favor '+ MSG_ERROR)
+            try:
+               edxlogin_user = edxloginuser_factory(doc_id, "doc_id")
+            except ValueError:
+                logger.error(f'{error_id} - Error when trying to create edxlogionuser with doc_id: {doc_id}')
+                return HttpResponseNotFound(
+                    f'(Error {error_id}) Error con la validacion del doc_id del usuario, por favor {MSG_ERROR}')
+            except PhApiException:
+                logger.error(f'{error_id} - Error when trying to create edxlogionuser with doc_id: {doc_id}')
+                return HttpResponseNotFound(
+                    f'(Error {error_id}) Error con la obtencion de datos desde ph para el usuario, por favor {MSG_ERROR}')
+            except EmailException:
+                logger.error(f'{error_id} - Error when trying to create edxlogionuser with doc_id: {doc_id}')
+                return HttpResponseNotFound(
+                    f'(Error {error_id}) Error con los correos del usuario, por favor {MSG_ERROR}')
+            except Exception:
+                logger.error(f'{error_id} - Error when trying to create edxlogionuser with doc_id: {doc_id}')
+                return HttpResponseNotFound(
+                    f'(Error {error_id}) Error con los datos del usuario, por favor {MSG_ERROR}')
+        # Enroll the user.
+        CourseEnrollment.enroll(edxlogin_user.user, CourseKey.from_string(str(mapp_course.edx_course)), mode=mode)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = self.get_payload(edxlogin_user.user, u_course)
+        token = jwt_encode_handler(payload)
+        return HttpResponse(
+            EdxUCursosLoginRedirect.get_callback_url(request, token))
 
     def get_data_ticket(self, ticket):
         """
@@ -169,13 +180,10 @@ class EdxUCursosLoginRedirect(View):
 
         return payload
 
-    def validate_data(self, doc_id, course):
+    def validate_data(self, course):
         """
-        Verify if doc_id is valid, if the course exists and if its associated to a Ucursos course.
+        Verify if the course exists and if its associated to a Ucursos course.
         """
-        # Checks if the doc_id is valid.
-        if not validate_all_doc_id_types(doc_id):
-            return False
         # Checks if there is a mapping between course and a ucursos course.
         try:
             course = EdxUCursosMapping.objects.get(
