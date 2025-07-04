@@ -578,14 +578,14 @@ class TestRedirectView(ModuleStoreTestCase):
 
     def test_verification_digit(self):
         """
-            TODO: add description and test a different rut
+            Test verification_digit() with a numerical verication digit.
         """
         verification_digit = EdxUCursosLoginRedirect.verification_digit(self, 1234567)
         self.assertEqual(verification_digit, '4')
 
     def test_verification_digit_K(self):
         """
-            TODO: add description.
+            Test verification_digit() with a 'K' verication digit.
         """
         verification_digit = EdxUCursosLoginRedirect.verification_digit(self, 19027537)
         self.assertEqual(verification_digit, 'K')
