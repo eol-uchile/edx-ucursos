@@ -1,4 +1,2 @@
+--src=/openedx/venv/src
 -e git+https://github.com/eol-uchile/uchileedxlogin@0.0.1#egg=uchileedxlogin
-pytest-django
-coverage
-genbadge
