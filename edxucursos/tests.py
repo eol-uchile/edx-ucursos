@@ -10,15 +10,13 @@ import uuid
 
 # Installed packages (via pip)
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from mock import patch, Mock
 from requests.exceptions import HTTPError
 from rest_framework_jwt.settings import api_settings
-from uchileedxlogin.models import EdxLoginUser
-from uchileedxlogin.views import EdxLoginStaff
+from uchileedxlogin.services.interface import EmailException, PhApiException
 
 # Edx dependencies
 from common.djangoapps.student.tests.factories import UserFactory
@@ -29,11 +27,6 @@ from xmodule.modulestore.tests.factories import CourseFactory
 # Internal project dependencies
 from .models import EdxUCursosMapping
 from .views import EdxUCursosLoginRedirect
-
-def create_user(user_data, have_pass):
-    return User.objects.create_user(
-        username=EdxLoginStaff().generate_username(user_data),
-        email=user_data['email'])
 
 
 class TestRedirectView(ModuleStoreTestCase):
@@ -54,60 +47,18 @@ class TestRedirectView(ModuleStoreTestCase):
                 email='student2@edx.org',
                 is_staff=True)
 
+    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.edxloginuser_factory')
     @patch('requests.get')
-    def test_login_with_rut_dv_is_K(self, get):
-        """
-            Test EdxUCursosLoginRedirect normal procedure with rut_dv is K
-        """
-        EdxLoginUser.objects.create(user=self.user, run='019027537K')
-        EdxUCursosMapping.objects.create(
-            edx_course=self.course.id,
-            ucurso_course='demo/2020/0/CV2020/1')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "raise_for_status",
-                    "text"])(
-                200,
-                Mock(),
-                json.dumps(
-                    {
-                        "pers_id": 19027537,
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        result = self.client.get(
-            reverse('edxucursos-login:login'),
-            data={
-                'ticket': 'testticket'})
-
-        self.assertIn(
-            'http://testserver/edxucursos/callback?token=',
-            result._container[0].decode())
-
-    @patch('requests.get')
-    def test_login(self, get):
+    def test_login(self, get, mock_edxloginuser_factory, mock_get_user):
         """
             Test EdxUCursosLoginRedirect normal procedure
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+
+        mock_get_user.return_value = None
+        mock_edxloginuser = Mock()
+        mock_edxloginuser.user = self.user
+        mock_edxloginuser_factory.return_value = mock_edxloginuser
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -155,7 +106,6 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when U-cursos ticket api is responding wrong
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -180,7 +130,6 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when ticket is wrong or none
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -206,7 +155,6 @@ class TestRedirectView(ModuleStoreTestCase):
         """
             Testing when ticket is expired
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         get.side_effect = [
             namedtuple(
                 "Request",
@@ -249,9 +197,8 @@ class TestRedirectView(ModuleStoreTestCase):
     @patch('requests.get')
     def test_login_no_exists_course(self, get):
         """
-            Testing when course no exists
+            Testing when course doesn't exists
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosMapping.objects.create(
             edx_course='course-v1:mss+MSS001+2019_2',
             ucurso_course='demo/2020/0/CV2020/1')
@@ -292,21 +239,24 @@ class TestRedirectView(ModuleStoreTestCase):
 
         self.assertEqual(result.status_code, 404)
         self.assertTrue(
-            'Error con los parametros' in
+            'Error con el parametro' in
             result._container[0].decode())
 
-    @patch(
-        "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
-        side_effect=create_user)
+    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.edxloginuser_factory')
     @patch('requests.get')
-    def test_login_create_user(self, get, mock_created_user):
+    def test_login_create_user(self, get, mock_edxloginuser_factory, mock_get_user):
         """
-            Testing when edxlogin_user no exists
+            Testing when edxlogin_user doesn't exists
         """
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
 
+        mock_get_user.return_value = None
+        mock_edxloginuser = Mock()
+        mock_edxloginuser.user = self.user
+        mock_edxloginuser_factory.return_value = mock_edxloginuser
         get.side_effect = [namedtuple(
             "Request",
             [
@@ -334,17 +284,7 @@ class TestRedirectView(ModuleStoreTestCase):
                         "semestre": "0",
                         "codigo": "CV2020",
                         "seccion": "1",
-                        "nombre": "Curso de prueba Virtual"}})),
-            namedtuple("Request",
-                       ["status_code",
-                        "json"])(200,
-                                 lambda:{'data':{'getRowsPersona':{'status_code':200,'persona':[
-                                            {"paterno": "TESTLASTNAME",
-                                            "materno": "TESTLASTNAME",
-                                            'pasaporte': [{'usuario':'avilio.perez'}],
-                                            "nombres": "TEST NAME",
-                                            'email': [{'email': 'student22@edx2.org'},{'email': 'student33@edx.org'},{'email': 'student44@edx.org'}],
-                                            "indiv_id": "0000000108"}]}}})]
+                        "nombre": "Curso de prueba Virtual"}}))]
 
         result = self.client.get(
             reverse('edxucursos-login:login'),
@@ -352,28 +292,20 @@ class TestRedirectView(ModuleStoreTestCase):
                 'ticket': 'testticket'})
 
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(
-            mock_created_user.call_args_list[0][0][0],
-            {
-                'username': 'avilio.perez',
-                'apellidoMaterno': 'TESTLASTNAME',
-                'nombres': 'TEST NAME',
-                'apellidoPaterno': 'TESTLASTNAME',
-                'rut': '0000000108',
-                'emails': ['student22@edx2.org','student33@edx.org', 'student44@edx.org'],
-                'email': 'student22@edx2.org'})
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
             result._container[0].decode())
-
-    @patch(
-        "uchileedxlogin.views.EdxLoginStaff.create_user_by_data",
-        side_effect=create_user)
+        
+    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.edxloginuser_factory')
     @patch('requests.get')
-    def test_login_fail_create_user(self, get, mock_created_user):
+    def test_login_fail_create_user_validation_error(self, get, mock_edxloginuser_factory, mock_get_user):
         """
-            Testing when fail in create user
+            Testing when a edxloginser couldn't be retrieved, and its creation fails with a 
+            ValidationError.
         """
+        mock_get_user.return_value = None
+        mock_edxloginuser_factory.side_effect = ValueError
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -416,16 +348,129 @@ class TestRedirectView(ModuleStoreTestCase):
 
         self.assertEqual(result.status_code, 404)
         self.assertTrue(
-            'Error con los datos del usuario' in
+            'Error con la validacion del doc_id del usuario' in
+            result._container[0].decode())
+        
+    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('requests.get')
+    def test_login_fail_create_user_ph_api_exception(self, get, mock_edxloginuser_factory, mock_get_user):
+        """
+            Testing when a edxloginser couldn't be retrieved, and its creation fails with a 
+            PhApiException.
+        """
+        mock_get_user.return_value = None
+        mock_edxloginuser_factory.side_effect = PhApiException
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [namedtuple(
+            "Request",
+            [
+                "status_code",
+                "raise_for_status",
+                "text"])(
+            200,
+            Mock(),
+            json.dumps(
+                {
+                    "pers_id": 10,
+                    "permisos": {
+                        "PROFESOR": 1,
+                        "VER": 1,
+                        "DEV": 1},
+                    "lang": "es",
+                    "theme": None,
+                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                    "time": time.time(),
+                    "mod_id": "eol",
+                    "gru_id": "curso.372168",
+                    "grupo": {
+                        "base": "demo",
+                        "anno": "2020",
+                        "semestre": "0",
+                        "codigo": "CV2020",
+                        "seccion": "1",
+                        "nombre": "Curso de prueba Virtual"}})),
+            namedtuple("Request",
+                       ["status_code",
+                        "text"])(404,
+                                 json.dumps({}))]
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertEqual(result.status_code, 404)
+        self.assertTrue(
+            'Error con la obtencion de datos desde ph para el usuario' in
+            result._container[0].decode())
+        
+    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('requests.get')
+    def test_login_fail_create_user_email_exception(self, get, mock_edxloginuser_factory, mock_get_user):
+        """
+            Testing when a edxloginser couldn't be retrieved, and its creation fails with a 
+            EmailException.
+        """
+        mock_get_user.return_value = None
+        mock_edxloginuser_factory.side_effect = EmailException
+        EdxUCursosMapping.objects.create(
+            edx_course=self.course.id,
+            ucurso_course='demo/2020/0/CV2020/1')
+        get.side_effect = [namedtuple(
+            "Request",
+            [
+                "status_code",
+                "raise_for_status",
+                "text"])(
+            200,
+            Mock(),
+            json.dumps(
+                {
+                    "pers_id": 10,
+                    "permisos": {
+                        "PROFESOR": 1,
+                        "VER": 1,
+                        "DEV": 1},
+                    "lang": "es",
+                    "theme": None,
+                    "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
+                    "time": time.time(),
+                    "mod_id": "eol",
+                    "gru_id": "curso.372168",
+                    "grupo": {
+                        "base": "demo",
+                        "anno": "2020",
+                        "semestre": "0",
+                        "codigo": "CV2020",
+                        "seccion": "1",
+                        "nombre": "Curso de prueba Virtual"}})),
+            namedtuple("Request",
+                       ["status_code",
+                        "text"])(404,
+                                 json.dumps({}))]
+        result = self.client.get(
+            reverse('edxucursos-login:login'),
+            data={
+                'ticket': 'testticket'})
+
+        self.assertEqual(result.status_code, 404)
+        self.assertTrue(
+            'Error con los correos del usuario' in
             result._container[0].decode())
 
     @override_settings(EDXUCURSOS_DOMAIN="http://change.domain.com")
+    @patch('edxucursos.views.get_user_by_doc_id')
     @patch('requests.get')
-    def test_login_with_domain(self, get):
+    def test_login_with_domain(self, get, mock_get_user):
         """
             Test EdxUCursosLoginRedirect normal procedure with domain settings
         """
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
+        mock_edxloginuser = Mock()
+        mock_edxloginuser.user = self.user
+        mock_get_user.return_value = mock_edxloginuser
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -468,12 +513,15 @@ class TestRedirectView(ModuleStoreTestCase):
             'http://change.domain.com/edxucursos/callback?token=',
             result._container[0].decode())
 
+    @patch('edxucursos.views.get_user_by_doc_id')
     @patch('requests.get')
-    def test_login_with_passport(self, get):
+    def test_login_with_passport(self, get, mock_get_user):
         """
-            Test EdxUCursosLoginRedirect with passport
+            Test EdxUCursosLoginRedirect with id_externo(passport) instead of rut.
         """
-        EdxLoginUser.objects.create(user=self.user, run='PABC112233')
+        mock_edxloginuser = Mock()
+        mock_edxloginuser.user = self.user
+        mock_get_user.return_value = mock_edxloginuser
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -516,190 +564,31 @@ class TestRedirectView(ModuleStoreTestCase):
         self.assertIn(
             'http://testserver/edxucursos/callback?token=',
             result._container[0].decode())
-
-    @patch('requests.get')
-    def test_login_with_wrong_passport(self, get):
-        """
-            Test EdxUCursosLoginRedirect with wrong passport
-        """
-        EdxLoginUser.objects.create(user=self.user, run='PABC1122')
-        EdxUCursosMapping.objects.create(
-            edx_course=self.course.id,
-            ucurso_course='demo/2020/0/CV2020/1')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "raise_for_status",
-                    "text"])(
-                200,
-                Mock(),
-                json.dumps(
-                    {
-                        "pers_id": 10,
-                        "id_externo":"P112",
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        result = self.client.get(
-            reverse('edxucursos-login:login'),
-            data={
-                'ticket': 'testticket'})
-
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Error con los parametros' in
-            result._container[0].decode())
-
-    @patch('requests.get')
-    def test_login_with_CG_account(self, get):
-        """
-            Test EdxUCursosLoginRedirect with CG account
-        """
-        EdxLoginUser.objects.create(user=self.user, run='CG00112233')
-        EdxUCursosMapping.objects.create(
-            edx_course=self.course.id,
-            ucurso_course='demo/2020/0/CV2020/1')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "raise_for_status",
-                    "text"])(
-                200,
-                Mock(),
-                json.dumps(
-                    {
-                        "pers_id": 10,
-                        "id_externo":"CG00112233",
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        result = self.client.get(
-            reverse('edxucursos-login:login'),
-            data={
-                'ticket': 'testticket'})
-
-        self.assertIn(
-            'http://testserver/edxucursos/callback?token=',
-            result._container[0].decode())
-
-    @patch('requests.get')
-    def test_login_with_CG_account_wrong(self, get):
-        """
-            Test EdxUCursosLoginRedirect with wrong CG account
-        """
-        EdxLoginUser.objects.create(user=self.user, run='CG00112233')
-        EdxUCursosMapping.objects.create(
-            edx_course=self.course.id,
-            ucurso_course='demo/2020/0/CV2020/1')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "raise_for_status",
-                    "text"])(
-                200,
-                Mock(),
-                json.dumps(
-                    {
-                        "pers_id": 10,
-                        "id_externo":"CG001122",
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        result = self.client.get(
-            reverse('edxucursos-login:login'),
-            data={
-                'ticket': 'testticket'})
-
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Error con los parametros' in
-            result._container[0].decode())
-        
-    def test_validate_data_invalid_rut(self):
-        """
-        This test checks that the validate_data method correctly identifies an invalid format RUT and logs a warning. 
-        It ensures the method enforces RUT validation rules and prevents further processing when the input is invalid.
-        """
-        with self.assertLogs('edxucursos.views', level='INFO') as cm:
-            result = EdxUCursosLoginRedirect.validate_data(self, '111111', '123456789')
-        self.assertFalse(result)
-        self.assertTrue(any(
-        'Rut invalido en EdxLoginStaff().validarRut(rut): 111111' in log
-        for log in cm.output))
-
-    def test_validate_data_none_as_rut(self):
-        """
-        This test checks that the validate_data method correctly identifies an invalid RUT in this case as a number instead of a string, and logs a warning.
-        It ensures the method enforces RUT validation rules and prevents further processing when the input is invalid.
-        """
-        with self.assertLogs('edxucursos.views', level='INFO') as cm:
-            result = EdxUCursosLoginRedirect.validate_data(self, 1111111, '123456789')
-        self.assertFalse(result)
-        self.assertTrue(any(
-        'Rut invalido: 111111' in log
-        for log in cm.output))
     
     def test_validate_data_course_invalid_data(self):
         """
         This test checks that the validate_data method correctly identifies an invalid course and logs a warning.
         """
         with self.assertLogs('edxucursos.views', level='INFO') as cm:
-            result = EdxUCursosLoginRedirect.validate_data(self, '11111111-1', '123456789')
+            result = EdxUCursosLoginRedirect.validate_data(self, '123456789')
         self.assertFalse(result)
         self.assertTrue(any(
         'No Existe EdxUCursosMapping, id: 123456789' in log
         for log in cm.output))
+
+    def test_verification_digit(self):
+        """
+            Test verification_digit() with a numerical verication digit.
+        """
+        verification_digit = EdxUCursosLoginRedirect.verification_digit(self, 1234567)
+        self.assertEqual(verification_digit, '4')
+
+    def test_verification_digit_K(self):
+        """
+            Test verification_digit() with a 'K' verication digit.
+        """
+        verification_digit = EdxUCursosLoginRedirect.verification_digit(self, 19027537)
+        self.assertEqual(verification_digit, 'K')
 
     def test_get_mode_ayudante(self):
         """
@@ -751,7 +640,6 @@ class TestCallbackView(TestCase):
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
         token = jwt_encode_handler(payload)
 
-        EdxLoginUser.objects.create(user=self.user, run='0000000108')
         EdxUCursosMapping.objects.create(
             edx_course='course-v1:mss+MSS001+2019_2',
             ucurso_course='demo/2020/0/CV2020/1')
