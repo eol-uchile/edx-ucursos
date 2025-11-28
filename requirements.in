@@ -1,17 +1,4 @@
-autopep8
-certifi
-chardet
-Django
-edx-opaque-keys
-funcsigs
-idna
-mock
-pbr
-pycodestyle
-pymongo
-pytz
 requests
 six
-stevedore
 Unidecode
-urllib3
+-e git+https://github.com/eol-uchile/eol_sso@1.0.1#egg=eol_sso
