@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.views.generic.base import View
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.utils import jwt_get_secret_key
-from uchileedxlogin.services.interface import edxloginuser_factory, EmailException, get_user_by_doc_id, PhApiException
+from eol_sso.services.interface import sso_user_factory, EmailException, get_user_by_indiv_id, PhApiException
 import jwt
 import requests
 import six
@@ -72,10 +72,11 @@ class EdxUCursosLoginRedirect(View):
             return HttpResponseNotFound(
                 '(Error '+ error_id +') Error con el parametro: id del curso, por favor '+ MSG_ERROR)
         mode = self.get_mode(user_data["permisos"])
-        edxlogin_user = get_user_by_doc_id(doc_id)
-        if not edxlogin_user:
+        user = get_user_by_indiv_id(doc_id)
+        if not user:
             try:
-               edxlogin_user = edxloginuser_factory(doc_id, "doc_id")
+               sso_user = sso_user_factory(doc_id, "doc_id")
+               user = sso_user.user
             except ValueError:
                 logger.error(f'{error_id} - Error when trying to create edxloginuser with doc_id: {doc_id}')
                 return HttpResponseNotFound(
@@ -93,9 +94,9 @@ class EdxUCursosLoginRedirect(View):
                 return HttpResponseNotFound(
                     f'(Error {error_id}) Error con los datos del usuario, por favor {MSG_ERROR}')
         # Enroll the user.
-        CourseEnrollment.enroll(edxlogin_user.user, CourseKey.from_string(str(mapp_course.edx_course)), mode=mode)
+        CourseEnrollment.enroll(user, CourseKey.from_string(str(mapp_course.edx_course)), mode=mode)
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        payload = self.get_payload(edxlogin_user.user, u_course)
+        payload = self.get_payload(user, u_course)
         token = jwt_encode_handler(payload)
         return HttpResponse(
             EdxUCursosLoginRedirect.get_callback_url(request, token))

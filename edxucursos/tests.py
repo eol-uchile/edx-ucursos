@@ -16,7 +16,7 @@ from django.urls import reverse
 from mock import patch, Mock
 from requests.exceptions import HTTPError
 from rest_framework_jwt.settings import api_settings
-from uchileedxlogin.services.interface import EmailException, PhApiException
+from eol_sso.services.interface import EmailException, PhApiException
 
 # Edx dependencies
 from common.djangoapps.student.tests.factories import UserFactory
@@ -47,10 +47,10 @@ class TestRedirectView(ModuleStoreTestCase):
                 email='student2@edx.org',
                 is_staff=True)
 
-    @patch('edxucursos.views.get_user_by_doc_id')
-    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('edxucursos.views.get_user_by_indiv_id')
+    @patch('edxucursos.views.sso_user_factory')
     @patch('requests.get')
-    def test_login(self, get, mock_edxloginuser_factory, mock_get_user):
+    def test_login(self, get, mock_sso_user_factory, mock_get_user):
         """
             Test EdxUCursosLoginRedirect normal procedure
         """
@@ -58,7 +58,7 @@ class TestRedirectView(ModuleStoreTestCase):
         mock_get_user.return_value = None
         mock_edxloginuser = Mock()
         mock_edxloginuser.user = self.user
-        mock_edxloginuser_factory.return_value = mock_edxloginuser
+        mock_sso_user_factory.return_value = mock_edxloginuser
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -242,10 +242,10 @@ class TestRedirectView(ModuleStoreTestCase):
             'Error con el parametro' in
             result._container[0].decode())
 
-    @patch('edxucursos.views.get_user_by_doc_id')
-    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('edxucursos.views.get_user_by_indiv_id')
+    @patch('edxucursos.views.sso_user_factory')
     @patch('requests.get')
-    def test_login_create_user(self, get, mock_edxloginuser_factory, mock_get_user):
+    def test_login_create_user(self, get, mock_sso_user_factory, mock_get_user):
         """
             Testing when edxlogin_user doesn't exists
         """
@@ -256,7 +256,7 @@ class TestRedirectView(ModuleStoreTestCase):
         mock_get_user.return_value = None
         mock_edxloginuser = Mock()
         mock_edxloginuser.user = self.user
-        mock_edxloginuser_factory.return_value = mock_edxloginuser
+        mock_sso_user_factory.return_value = mock_edxloginuser
         get.side_effect = [namedtuple(
             "Request",
             [
@@ -296,16 +296,16 @@ class TestRedirectView(ModuleStoreTestCase):
             'http://testserver/edxucursos/callback?token=',
             result._container[0].decode())
         
-    @patch('edxucursos.views.get_user_by_doc_id')
-    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('edxucursos.views.get_user_by_indiv_id')
+    @patch('edxucursos.views.sso_user_factory')
     @patch('requests.get')
-    def test_login_fail_create_user_validation_error(self, get, mock_edxloginuser_factory, mock_get_user):
+    def test_login_fail_create_user_validation_error(self, get, mock_sso_user_factory, mock_get_user):
         """
             Testing when a edxloginser couldn't be retrieved, and its creation fails with a 
             ValidationError.
         """
         mock_get_user.return_value = None
-        mock_edxloginuser_factory.side_effect = ValueError
+        mock_sso_user_factory.side_effect = ValueError
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -351,16 +351,16 @@ class TestRedirectView(ModuleStoreTestCase):
             'Error con la validacion del doc_id del usuario' in
             result._container[0].decode())
         
-    @patch('edxucursos.views.get_user_by_doc_id')
-    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('edxucursos.views.get_user_by_indiv_id')
+    @patch('edxucursos.views.sso_user_factory')
     @patch('requests.get')
-    def test_login_fail_create_user_ph_api_exception(self, get, mock_edxloginuser_factory, mock_get_user):
+    def test_login_fail_create_user_ph_api_exception(self, get, mock_sso_user_factory, mock_get_user):
         """
             Testing when a edxloginser couldn't be retrieved, and its creation fails with a 
             PhApiException.
         """
         mock_get_user.return_value = None
-        mock_edxloginuser_factory.side_effect = PhApiException
+        mock_sso_user_factory.side_effect = PhApiException
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -406,16 +406,16 @@ class TestRedirectView(ModuleStoreTestCase):
             'Error con la obtencion de datos desde ph para el usuario' in
             result._container[0].decode())
         
-    @patch('edxucursos.views.get_user_by_doc_id')
-    @patch('edxucursos.views.edxloginuser_factory')
+    @patch('edxucursos.views.get_user_by_indiv_id')
+    @patch('edxucursos.views.sso_user_factory')
     @patch('requests.get')
-    def test_login_fail_create_user_email_exception(self, get, mock_edxloginuser_factory, mock_get_user):
+    def test_login_fail_create_user_email_exception(self, get, mock_sso_user_factory, mock_get_user):
         """
             Testing when a edxloginser couldn't be retrieved, and its creation fails with a 
             EmailException.
         """
         mock_get_user.return_value = None
-        mock_edxloginuser_factory.side_effect = EmailException
+        mock_sso_user_factory.side_effect = EmailException
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -462,15 +462,13 @@ class TestRedirectView(ModuleStoreTestCase):
             result._container[0].decode())
 
     @override_settings(EDXUCURSOS_DOMAIN="http://change.domain.com")
-    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.get_user_by_indiv_id')
     @patch('requests.get')
     def test_login_with_domain(self, get, mock_get_user):
         """
             Test EdxUCursosLoginRedirect normal procedure with domain settings
         """
-        mock_edxloginuser = Mock()
-        mock_edxloginuser.user = self.user
-        mock_get_user.return_value = mock_edxloginuser
+        mock_get_user.return_value = self.user
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
@@ -513,15 +511,13 @@ class TestRedirectView(ModuleStoreTestCase):
             'http://change.domain.com/edxucursos/callback?token=',
             result._container[0].decode())
 
-    @patch('edxucursos.views.get_user_by_doc_id')
+    @patch('edxucursos.views.get_user_by_indiv_id')
     @patch('requests.get')
     def test_login_with_passport(self, get, mock_get_user):
         """
             Test EdxUCursosLoginRedirect with id_externo(passport) instead of rut.
         """
-        mock_edxloginuser = Mock()
-        mock_edxloginuser.user = self.user
-        mock_get_user.return_value = mock_edxloginuser
+        mock_get_user.return_value = self.user
         EdxUCursosMapping.objects.create(
             edx_course=self.course.id,
             ucurso_course='demo/2020/0/CV2020/1')
