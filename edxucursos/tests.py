@@ -97,9 +97,10 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertIn(
-            'http://testserver/edxucursos/callback?token=',
-            result._container[0].decode())
+        self.assertEqual(result.status_code, 302)
+        target_login_url = reverse('uchileedxlogin-login:login')
+        self.assertIn(target_login_url, result['Location'])
+        self.assertIn('?next=', result['Location'])
 
     @patch('requests.get')
     def test_login_server_error(self, get):
@@ -291,10 +292,10 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEqual(result.status_code, 200)
-        self.assertIn(
-            'http://testserver/edxucursos/callback?token=',
-            result._container[0].decode())
+        self.assertEqual(result.status_code, 302)
+        target_login_url = reverse('uchileedxlogin-login:login')
+        self.assertIn(target_login_url, result['Location'])
+        self.assertIn('?next=', result['Location'])
         
     @patch('edxucursos.views.get_user_by_indiv_id')
     @patch('edxucursos.views.sso_user_factory')
@@ -461,55 +462,6 @@ class TestRedirectView(ModuleStoreTestCase):
             'Error con los correos del usuario' in
             result._container[0].decode())
 
-    @override_settings(EDXUCURSOS_DOMAIN="http://change.domain.com")
-    @patch('edxucursos.views.get_user_by_indiv_id')
-    @patch('requests.get')
-    def test_login_with_domain(self, get, mock_get_user):
-        """
-            Test EdxUCursosLoginRedirect normal procedure with domain settings
-        """
-        mock_get_user.return_value = self.user
-        EdxUCursosMapping.objects.create(
-            edx_course=self.course.id,
-            ucurso_course='demo/2020/0/CV2020/1')
-        get.side_effect = [
-            namedtuple(
-                "Request",
-                [
-                    "status_code",
-                    "raise_for_status",
-                    "text"])(
-                200,
-                Mock(),
-                json.dumps(
-                    {
-                        "pers_id": 10,
-                        "permisos": {
-                            "PROFESOR": 1,
-                            "VER": 1,
-                            "DEV": 1},
-                        "lang": "es",
-                        "theme": None,
-                        "css": "https:\/\/www.u-cursos.cl\/d\/css\/style_externo_v7714.css",
-                        "time": time.time(),
-                        "mod_id": "eol",
-                        "gru_id": "curso.372168",
-                        "grupo": {
-                                "base": "demo",
-                                "anno": "2020",
-                                "semestre": "0",
-                                "codigo": "CV2020",
-                                "seccion": "1",
-                                "nombre": "Curso de prueba Virtual"}}))]
-
-        result = self.client.get(
-            reverse('edxucursos-login:login'),
-            data={
-                'ticket': 'testticket'})
-
-        self.assertIn(
-            'http://change.domain.com/edxucursos/callback?token=',
-            result._container[0].decode())
 
     @patch('edxucursos.views.get_user_by_indiv_id')
     @patch('requests.get')
@@ -557,9 +509,10 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertIn(
-            'http://testserver/edxucursos/callback?token=',
-            result._container[0].decode())
+        self.assertEqual(result.status_code, 302)
+        target_login_url = reverse('uchileedxlogin-login:login')
+        self.assertIn(target_login_url, result['Location'])
+        self.assertIn('?next=', result['Location'])
     
     def test_validate_data_course_invalid_data(self):
         """
@@ -607,246 +560,3 @@ class TestRedirectView(ModuleStoreTestCase):
         }
         result = EdxUCursosLoginRedirect.get_mode(self, data)
         self.assertEqual(result, "honor")
-
-class TestCallbackView(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.token = str(uuid.uuid4())
-        self.user = UserFactory(
-            username='testuser',
-            password='12345',
-            email='testuser@edx.org')
-        self.student = UserFactory(
-            username='student',
-            password='12345',
-            email='student@edx.org')
-
-    def test_normal(self):
-        """
-            Test EdxUCursosCallback normal procedure
-        """
-        payload = {'username': self.user.username,
-                   'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
-                   'course': 'demo/2020/0/CV2020/1'}
-
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-
-        EdxUCursosMapping.objects.create(
-            edx_course='course-v1:mss+MSS001+2019_2',
-            ucurso_course='demo/2020/0/CV2020/1')
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        self.assertEqual(result.status_code, 302)
-        self.assertEqual(
-            result._headers['location'],
-            ('Location',
-             '/courses/course-v1:mss+MSS001+2019_2/course/'))
-
-    def test_callback_no_token(self):
-        """
-            Testing when token is empty
-        """
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': ""})
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Error en la decoficación' in
-            result._container[0].decode())
-
-    def test_callback_wrong_token_data(self):
-        """
-            Testing when data token is wrong
-        """
-        payload = {'username': self.user.username,
-                   'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
-                   'course': 'demo/2020/0/CV2020/1'}
-        payload['aud'] = "WRONG_AUD_TEST"
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Error en la decoficación' in
-            result._container[0].decode())
-
-    def test_callback_wrong_token(self):
-        """
-            Testing when token is wrong
-        """
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': "asdfghjkl1234567890.123456789asdfghjk.asdfgh123456"})
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Error en la decoficación' in
-            result._container[0].decode())
-
-    def test_callback_expired_token(self):
-        """
-            Testing when token is expired
-        """
-        payload = {'username': self.user.username,
-                   'user_id': self.user.id,
-                   'exp': dt.utcnow(),
-                   'course': 'demo/2020/0/CV2020/1'}
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-        time.sleep(2)
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Ticket caducado' in
-            result._container[0].decode())
-
-    def test_callback_no_course(self):
-        """
-            Testing when course data no exists
-        """
-        payload = {'username': self.user.username, 'user_id': self.user.id, 'exp': dt.utcnow(
-        ) + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME)}
-
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Error en la decoficación (parametro: curso)' in
-            result._container[0].decode())
-
-    def test_callback_no_mapping_course(self):
-        """
-            Testing when ucurse_id no exists
-        """
-        payload = {'username': self.user.username,
-                   'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
-                   'course': 'test/2020/0/CV2020/1'}
-
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'El curso no se ha vinculado con un curso de eol' in
-            result._container[0].decode())
-
-    def test_callback_user_logged(self):
-        """
-            Test when user is already logged
-        """
-        self.client.login(username='student', password='12345')
-        payload = {'username': self.user.username,
-                   'user_id': self.student.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
-                   'course': 'demo/2020/0/CV2020/1'}
-
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-        EdxUCursosMapping.objects.create(
-            edx_course='course-v1:mss+MSS001+2019_2',
-            ucurso_course='demo/2020/0/CV2020/1')
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        self.assertEqual(result.status_code, 302)
-        self.assertEqual(
-            result._headers['location'],
-            ('Location',
-             '/courses/course-v1:mss+MSS001+2019_2/course/'))
-
-    def test_callback_different_user_logged(self):
-        """
-            Test when another user is already logged
-        """
-        self.client.login(username='student', password='12345')
-        payload = {'username': self.user.username,
-                   'user_id': self.user.id,
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
-                   'course': 'demo/2020/0/CV2020/1'}
-
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-
-        EdxUCursosMapping.objects.create(
-            edx_course='course-v1:mss+MSS001+2019_2',
-            ucurso_course='demo/2020/0/CV2020/1')
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        
-        self.assertEqual(result.status_code, 302)
-        self.assertEqual(
-            result._headers['location'],
-            ('Location',
-             '/courses/course-v1:mss+MSS001+2019_2/course/'))
-    
-    def test_callback_different_wrong_user_id(self):
-        """
-           Tests the behavior when a non-existent user_id is provided by verifying that the expected 
-           log message is generated, indicating login error.
-        """
-        self.client.login(username='student', password='12345')
-        payload = {'username': self.user.username,
-                   'user_id': '11111111',
-                   'exp': dt.utcnow() + datetime.timedelta(seconds=settings.EDXUCURSOS_EXP_TIME),
-                   'course': 'demo/2020/0/CV2020/1'}
-
-        if api_settings.JWT_AUDIENCE is not None:
-            payload['aud'] = api_settings.JWT_AUDIENCE
-
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        token = jwt_encode_handler(payload)
-
-        EdxUCursosMapping.objects.create(
-            edx_course='course-v1:mss+MSS001+2019_2',
-            ucurso_course='demo/2020/0/CV2020/1')
-        result = self.client.get(
-            reverse('edxucursos-login:callback'),
-            data={
-                'token': token})
-        
-        self.assertEqual(result.status_code, 404)
-        self.assertTrue(
-            'Logging Error, reintente nuevamente' in
-            result._container[0].decode())
