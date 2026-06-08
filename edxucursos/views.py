@@ -11,8 +11,9 @@ import uuid
 
 # Installed packages (via pip)
 from django.conf import settings
-from django.http import HttpResponseRedirect, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseNotFound
 from django.urls import reverse
+from django.utils.http import urlquote_plus
 from django.views.generic.base import View
 from eol_sso.services.interface import sso_user_factory, EmailException, get_user_by_indiv_id, PhApiException
 import requests
@@ -89,13 +90,12 @@ class EdxUCursosLoginRedirect(View):
                     f'(Error {error_id}) Error con los datos del usuario, por favor {MSG_ERROR}')
         # Enroll the user.
         CourseEnrollment.enroll(user, CourseKey.from_string(str(mapp_course.edx_course)), mode=mode)
-        # Create the redirect_url and redirect the user to the sso login
+        # Generate the SSO login URL and return it in the response body
         target_path = "/courses/{}/course/".format(str(mapp_course.edx_course))
-        redirect_url = base64.b64encode(target_path.encode("utf-8")).decode("utf-8")
         url = request.build_absolute_uri(
             reverse('uchileedxlogin-login:login'))
-        return HttpResponseRedirect(
-            '{}?next={}'.format(url, redirect_url))
+        return HttpResponse(
+            '{}?next={}'.format(url, urlquote_plus(target_path)))
 
     def get_data_ticket(self, ticket):
         """
