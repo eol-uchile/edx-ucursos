@@ -97,10 +97,11 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEqual(result.status_code, 302)
+        self.assertEqual(result.status_code, 200)
+        response_text = result.content.decode('utf-8')
         target_login_url = reverse('uchileedxlogin-login:login')
-        self.assertIn(target_login_url, result['Location'])
-        self.assertIn('?next=', result['Location'])
+        self.assertIn(target_login_url, response_text)
+        self.assertIn('?next=', response_text)
 
     @patch('requests.get')
     def test_login_server_error(self, get):
@@ -292,10 +293,11 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEqual(result.status_code, 302)
+        self.assertEqual(result.status_code, 200)
+        response_text = result.content.decode('utf-8')
         target_login_url = reverse('uchileedxlogin-login:login')
-        self.assertIn(target_login_url, result['Location'])
-        self.assertIn('?next=', result['Location'])
+        self.assertIn(target_login_url, response_text)
+        self.assertIn('?next=', response_text)
         
     @patch('edxucursos.views.get_user_by_indiv_id')
     @patch('edxucursos.views.sso_user_factory')
@@ -509,10 +511,11 @@ class TestRedirectView(ModuleStoreTestCase):
             data={
                 'ticket': 'testticket'})
 
-        self.assertEqual(result.status_code, 302)
+        self.assertEqual(result.status_code, 200)
+        response_text = result.content.decode('utf-8')
         target_login_url = reverse('uchileedxlogin-login:login')
-        self.assertIn(target_login_url, result['Location'])
-        self.assertIn('?next=', result['Location'])
+        self.assertIn(target_login_url, response_text)
+        self.assertIn('?next=', response_text)
     
     def test_validate_data_course_invalid_data(self):
         """

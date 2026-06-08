@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="edxucursos",
-    version="3.0.0",
+    version="3.0.1",
     author="EOL UChile",
     author_email="eol-ing@uchile.cl",
     description="Authentication backend for EOl from Ucursos",
