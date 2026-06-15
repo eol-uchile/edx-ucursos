@@ -7,4 +7,5 @@ from .views import *
 urlpatterns = [
     url('externo', EdxUCursosLoginRedirect.as_view(), name='login'),
     url('edxucursos/externo', EdxUCursosLoginRedirect.as_view(), name='login'),
+    url('edxucursos/launch', EdxUcursosLoginLaunch.as_view(), name='launch'),
 ]

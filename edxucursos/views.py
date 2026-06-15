@@ -14,7 +14,7 @@ from django.conf import settings
 from django.http import HttpResponse, HttpResponseNotFound
 from django.urls import reverse
 from django.utils.http import urlquote_plus
-from django.views.generic.base import View
+from django.views.generic.base import TemplateView, View
 from eol_sso.services.interface import sso_user_factory, EmailException, get_user_by_indiv_id, PhApiException
 import requests
 import six
@@ -93,7 +93,7 @@ class EdxUCursosLoginRedirect(View):
         # Generate the SSO login URL and return it in the response body
         target_path = "/courses/{}/course/".format(str(mapp_course.edx_course))
         url = request.build_absolute_uri(
-            reverse('uchileedxlogin-login:login'))
+            reverse('edxucursos-login:launch'))
         return HttpResponse(
             '{}?next={}'.format(url, urlquote_plus(target_path)))
 
@@ -192,3 +192,16 @@ class EdxUCursosLoginRedirect(View):
         if "AYUDANTE" in data and data["AYUDANTE"] == 1:
             return "audit"
         return "honor"
+
+class EdxUcursosLoginLaunch(TemplateView):
+    template_name = 'edxucursos/redirect.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Create the redirect url using the next parameter
+        next_destination = self.request.GET.get('next', '')
+        login_base_url = reverse('uchileedxlogin-login:login')
+        encoded_next = urlquote_plus(next_destination)
+        context['target_url'] = f"{login_base_url}?next={encoded_next}"
+        
+        return context
