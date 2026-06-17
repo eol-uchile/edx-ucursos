@@ -1,0 +1,55 @@
+## mako
+
+<%page expression_filter="h" />
+<%! from django.utils.translation import ugettext as _ %>
+<!DOCTYPE html>
+
+<head>
+  <title> Redirect </title>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    .login-redirect-container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .login-redirect-container p { 
+      margin-bottom: 8px;
+    }
+
+    .login-redirect-container a {
+      display: inline-block;
+      padding: 8px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <main id="main" aria-label="Content" tabindex="-1" class="static_pages">
+    <div class="login-redirect-container">
+      <h2>
+        ${_("Redirecting to your course...")}
+      </h2>
+      <p>
+        ${_("You may be prompted to log in first. If the new tab didn't open automatically, you can open it manually below.")}
+      </p>
+      <a href="${target_url | x}" target="_blank">
+        ${_("Open EOL in a new tab")}
+      </a>
+    </div>
+  </main>
+  <script type="text/javascript">
+    const targetUrl = "${target_url | x}";
+
+    const openedWindow = window.open(targetUrl, '_blank');
+
+    if (!openedWindow || openedWindow.closed || typeof openedWindow.closed === 'undefined') {
+      console.log('popup blocked')
+    }
+  </script>
+</body>
+
+</html>

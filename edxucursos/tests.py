@@ -99,7 +99,7 @@ class TestRedirectView(ModuleStoreTestCase):
 
         self.assertEqual(result.status_code, 200)
         response_text = result.content.decode('utf-8')
-        target_login_url = reverse('uchileedxlogin-login:login')
+        target_login_url = reverse('edxucursos-login:launch')
         self.assertIn(target_login_url, response_text)
         self.assertIn('?next=', response_text)
 
@@ -295,7 +295,7 @@ class TestRedirectView(ModuleStoreTestCase):
 
         self.assertEqual(result.status_code, 200)
         response_text = result.content.decode('utf-8')
-        target_login_url = reverse('uchileedxlogin-login:login')
+        target_login_url = reverse('edxucursos-login:launch')
         self.assertIn(target_login_url, response_text)
         self.assertIn('?next=', response_text)
         
@@ -513,7 +513,7 @@ class TestRedirectView(ModuleStoreTestCase):
 
         self.assertEqual(result.status_code, 200)
         response_text = result.content.decode('utf-8')
-        target_login_url = reverse('uchileedxlogin-login:login')
+        target_login_url = reverse('edxucursos-login:launch')
         self.assertIn(target_login_url, response_text)
         self.assertIn('?next=', response_text)
     
